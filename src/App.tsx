@@ -428,28 +428,44 @@ export default function App() {
     }).length
   , [drivers, plans]);
 
-  const potentialReplacements = useMemo(() => {
-    if (!selectedTripDriverId) return [];
-    let leavingCompanyType: RegistrationType | '' = '';
-    let leavingSpecialization: DriverSpecialization | '' = '';
+  // Keičiamo reiso „taikinys": įmonė + mašinos tipas (Tentas/Refas) — pagal tai rūšiuojamos rekomendacijos.
+  const replaceTarget = useMemo(() => {
+    if (!selectedTripDriverId) return null;
     if (selectedTripDriverId.startsWith('CAR:')) {
-      const car = cars.find(c => c.number === selectedTripDriverId.replace('CAR:', ''));
-      if (car) leavingCompanyType = car.registration;
-    } else {
-      const d = drivers.find(x => x.id === selectedTripDriverId);
-      if (d) { leavingCompanyType = d.companyType; leavingSpecialization = d.specialization; }
+      const car = cars.find(c => c.number === selectedTripDriverId.replace('CAR:', '')) || null;
+      return car ? { company: car.registration, carType: car.type as CarType | '', car } : null;
     }
+    const d = drivers.find(x => x.id === selectedTripDriverId);
+    if (!d) return null;
+    const car = cars.find(c => c.number === d.currentCar) || null;
+    return { company: d.companyType, carType: (car?.type ?? '') as CarType | '', car };
+  }, [selectedTripDriverId, drivers, cars]);
+
+  // Specializacijos tinkamumas mašinai: 0 = tiksli (Tentas↔Tentas / Refas↔Refas),
+  // 1 = Universalus (gali vairuoti bet kurią), 2 = priešinga specializacija.
+  const specFit = (d: Driver, carType: CarType | '') => {
+    if (carType && d.specialization === carType) return 0;
+    if (d.specialization === 'Universalus') return 1;
+    return 2;
+  };
+
+  const potentialReplacements = useMemo(() => {
+    if (!replaceTarget) return [];
+    const { company, carType } = replaceTarget;
     return drivers.filter(d => d.status === 'Namuose').sort((a, b) => {
+      // 1) ta pati įmonė pirmiau
+      const ca = a.companyType === company ? 0 : 1;
+      const cb = b.companyType === company ? 0 : 1;
+      if (ca !== cb) return ca - cb;
+      // 2) specializacijos atitiktis mašinai (tiksli → universalus → priešinga)
+      const sa = specFit(a, carType), sb = specFit(b, carType);
+      if (sa !== sb) return sa - sb;
+      // 3) tarp lygių — anksčiau pasiruošę pirmiau
       const da = a.readinessDate ? parseISO(a.readinessDate).getTime() : Infinity;
       const db = b.readinessDate ? parseISO(b.readinessDate).getTime() : Infinity;
-      if (da !== db) return da - db;
-      const score = (d: Driver) => {
-        const sc = d.companyType === leavingCompanyType, ss = leavingSpecialization ? d.specialization === leavingSpecialization : true, su = d.specialization === 'Universalus';
-        return sc ? (ss ? 6 : su ? 5 : 4) : (ss ? 3 : su ? 2 : 1);
-      };
-      return score(b) - score(a);
+      return da - db;
     });
-  }, [drivers, selectedTripDriverId, cars]);
+  }, [drivers, replaceTarget]);
 
   const potentialTrips = useMemo(() => {
     if (!selectedHomeDriverId) return [];
@@ -653,12 +669,15 @@ export default function App() {
                   <select className={selectCls} value={selectedTripDriverId} onChange={e => setSelectedTripDriverId(e.target.value)}>
                     <option value="">Pasirinkite...</option>
                     <optgroup label="Reise">
-                      {drivers.filter(d => d.status === 'Reise').sort((a,b) => (a.plannedReturnDate||'').localeCompare(b.plannedReturnDate||'')).map(d => (
-                        <option key={d.id} value={d.id} disabled={plans.some(p => p.status === 'Suplanuota' && p.leavingDriverId === d.id)}>
-                          {d.currentCar} • {d.name} — grįžta: {d.plannedReturnDate || '?'}
-                          {plans.some(p => p.status === 'Suplanuota' && p.leavingDriverId === d.id) ? ' (suplanuota)' : ''}
-                        </option>
-                      ))}
+                      {drivers.filter(d => d.status === 'Reise').sort((a,b) => (a.plannedReturnDate||'').localeCompare(b.plannedReturnDate||'')).map(d => {
+                        const carType = cars.find(c => c.number === d.currentCar)?.type;
+                        return (
+                          <option key={d.id} value={d.id} disabled={plans.some(p => p.status === 'Suplanuota' && p.leavingDriverId === d.id)}>
+                            {d.currentCar}{carType ? ` (${carType})` : ''} • {d.name} — grįžta: {d.plannedReturnDate || '?'}
+                            {plans.some(p => p.status === 'Suplanuota' && p.leavingDriverId === d.id) ? ' (suplanuota)' : ''}
+                          </option>
+                        );
+                      })}
                     </optgroup>
                     <optgroup label="Laisvi automobiliai">
                       {cars.filter(c => !drivers.some(d => d.currentCar === c.number)).map(c => (
@@ -676,20 +695,29 @@ export default function App() {
                   </Field>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Rekomenduojami ({potentialReplacements.length})</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted">Rekomenduojami ({potentialReplacements.length})</p>
+                    {replaceTarget?.car && (
+                      <span className="text-[11px] text-muted whitespace-nowrap">
+                        {replaceTarget.car.number} · <span className="font-medium text-ink">{replaceTarget.carType || '—'}</span> · {replaceTarget.company}
+                      </span>
+                    )}
+                  </div>
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                    {potentialReplacements.length === 0 && <p className="text-xs text-stone-400 italic py-4 text-center">Nėra laisvų vairuotojų</p>}
+                    {potentialReplacements.length === 0 && <p className="text-xs text-muted italic py-4 text-center">Nėra laisvų vairuotojų</p>}
                     {potentialReplacements.map(d => {
                       const isPlanned = plans.some(p => p.incomingDriverId === d.id && p.status === 'Suplanuota');
                       const daysHome  = d.lastTripEndDate ? differenceInDays(new Date(), parseISO(d.lastTripEndDate)) : null;
+                      const fit = specFit(d, replaceTarget?.carType ?? '');
+                      const sameCompany = !!replaceTarget && d.companyType === replaceTarget.company;
                       return (
-                        <div key={d.id} className={cn("flex items-center justify-between p-3 rounded-xl border transition-all", isPlanned ? "bg-emerald-50 border-emerald-200" : "bg-stone-50 border-stone-100 hover:border-stone-300")}>
+                        <div key={d.id} className={cn("flex items-center justify-between p-3 rounded-xl border transition-all", isPlanned ? "bg-emerald-50 border-emerald-200" : "bg-canvas border-hairline hover:border-ink/25")}>
                           <div>
                             <p className="text-sm font-semibold">{d.name}</p>
-                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                              <Badge variant="blue">{d.specialization}</Badge>
-                              <Badge>{d.companyType}</Badge>
-                              <span className="text-[10px] text-stone-400">Nuo: {d.readinessDate || '?'}{daysHome !== null ? ` (${daysHome}d. namuose)` : ''}</span>
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              <Badge variant={fit === 0 ? 'green' : fit === 1 ? 'blue' : 'default'}>{d.specialization}</Badge>
+                              <Badge variant={sameCompany ? 'green' : 'default'}>{d.companyType}</Badge>
+                              <span className="text-[10px] text-muted">Nuo: {d.readinessDate || '?'}{daysHome !== null ? ` (${daysHome}d. namuose)` : ''}</span>
                             </div>
                           </div>
                           {isPlanned ? (
@@ -699,7 +727,7 @@ export default function App() {
                               const leaving = selectedTripDriverId.startsWith('CAR:') ? null : drivers.find(x => x.id === selectedTripDriverId);
                               const carNum  = selectedTripDriverId.startsWith('CAR:') ? selectedTripDriverId.replace('CAR:','') : leaving?.currentCar || '';
                               setConfirmData({ carNumber: carNum, leavingId: leaving?.id || null, incomingId: d.id, date: targetReplaceDate, driverName: d.name });
-                            }} className="bg-stone-900 text-white text-xs font-bold px-3 py-1.5 rounded-xl hover:bg-stone-700 transition-colors">
+                            }} className="bg-ink text-white text-xs font-medium px-3.5 py-1.5 rounded-full hover:bg-ink/85 transition-colors">
                               Planuoti
                             </button>
                           )}
