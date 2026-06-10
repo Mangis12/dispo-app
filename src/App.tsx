@@ -43,28 +43,38 @@ const INITIAL_CARS: Car[] = [
 type Tab = 'dashboard' | 'planning' | 'drivers' | 'cars' | 'history' | 'calendar' | 'auto-grafikas' | 'trip';
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
-function StatCard({ label, value, sub, color }: { label: string; value: number | string; sub?: string; color: string }) {
+function StatCard({ label, value, sub, accent, onClick }: { label: string; value: number | string; sub?: string; accent?: string; onClick?: () => void }) {
+  const Tag = onClick ? 'button' : 'div';
   return (
-    <div className={cn("rounded-2xl p-5 border", color)}>
-      <p className="text-xs font-semibold uppercase tracking-widest opacity-60 mb-1">{label}</p>
-      <p className="text-3xl font-black">{value}</p>
-      {sub && <p className="text-xs opacity-50 mt-1">{sub}</p>}
-    </div>
+    <Tag
+      onClick={onClick}
+      className={cn(
+        "text-left rounded-2xl p-6 bg-surface border border-hairline shadow-card transition-all",
+        onClick && "hover:border-ink/25 hover:-translate-y-0.5 cursor-pointer"
+      )}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <span className={cn("w-1.5 h-1.5 rounded-full", accent ?? "bg-stone-300")} />
+        <p className="text-[11px] font-medium uppercase tracking-wider text-muted">{label}</p>
+      </div>
+      <p className="text-[2rem] leading-none font-semibold tracking-tight text-ink">{value}</p>
+      {sub && <p className="text-xs text-muted mt-2">{sub}</p>}
+    </Tag>
   );
 }
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 function Badge({ children, variant = 'default' }: { children: React.ReactNode; variant?: 'default' | 'blue' | 'green' | 'red' | 'amber' | 'purple' }) {
   const variants = {
-    default: 'bg-stone-100 text-stone-600 border-stone-200',
-    blue:    'bg-blue-50 text-blue-700 border-blue-100',
-    green:   'bg-emerald-50 text-emerald-700 border-emerald-100',
-    red:     'bg-red-50 text-red-700 border-red-100',
-    amber:   'bg-amber-50 text-amber-700 border-amber-100',
-    purple:  'bg-purple-50 text-purple-700 border-purple-100',
+    default: 'bg-stone-100 text-stone-500',
+    blue:    'bg-blue-50 text-blue-600',
+    green:   'bg-emerald-50 text-emerald-600',
+    red:     'bg-red-50 text-red-500',
+    amber:   'bg-amber-50 text-amber-600',
+    purple:  'bg-violet-50 text-violet-600',
   };
   return (
-    <span className={cn("inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border", variants[variant])}>
+    <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide", variants[variant])}>
       {children}
     </span>
   );
@@ -73,13 +83,13 @@ function Badge({ children, variant = 'default' }: { children: React.ReactNode; v
 // ─── Modal Wrapper ────────────────────────────────────────────────────────────
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-stone-100 overflow-hidden slide-in-from-bottom-4">
-        <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between">
-          <h2 className="text-base font-bold">{title}</h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors"><X size={16} /></button>
+    <div className="fixed inset-0 bg-ink/20 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
+      <div className="bg-surface w-full max-w-md rounded-3xl shadow-float border border-hairline overflow-hidden slide-in-from-bottom-4">
+        <div className="px-6 py-5 flex items-center justify-between">
+          <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+          <button onClick={onClose} className="p-1.5 -mr-1 text-muted hover:text-ink hover:bg-stone-100 rounded-lg transition-colors"><X size={16} /></button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="px-6 pb-6">{children}</div>
       </div>
     </div>
   );
@@ -89,14 +99,14 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-[10px] font-bold uppercase tracking-wider text-stone-400">{label}</label>
+      <label className="text-[11px] font-medium uppercase tracking-wider text-muted">{label}</label>
       {children}
     </div>
   );
 }
 
-const inputCls = "w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-stone-900/10 focus:border-stone-400 transition-all";
-const selectCls = "w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-stone-900/10 transition-all appearance-none";
+const inputCls = "w-full bg-canvas border border-hairline rounded-xl px-3.5 py-2.5 text-sm text-ink placeholder:text-stone-400 focus:outline-none focus:bg-white focus:border-ink/40 transition-all";
+const selectCls = "w-full bg-canvas border border-hairline rounded-xl px-3.5 py-2.5 text-sm text-ink focus:outline-none focus:bg-white focus:border-ink/40 transition-all appearance-none";
 
 // ─── Tab Button ───────────────────────────────────────────────────────────────
 function TabBtn({ active, onClick, icon, label, badge }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; badge?: number }) {
@@ -104,14 +114,14 @@ function TabBtn({ active, onClick, icon, label, badge }: { active: boolean; onCl
     <button
       onClick={onClick}
       className={cn(
-        "relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap",
-        active ? "bg-stone-900 text-white shadow-sm" : "text-stone-500 hover:text-stone-900 hover:bg-stone-100"
+        "relative flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap",
+        active ? "bg-ink text-white" : "text-muted hover:text-ink hover:bg-stone-100"
       )}
     >
       {icon}
       <span className="hidden sm:inline">{label}</span>
       {badge != null && badge > 0 && (
-        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">
+        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-400 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
           {badge > 9 ? '9+' : badge}
         </span>
       )}
@@ -455,29 +465,29 @@ export default function App() {
 
   if (!loaded) {
     return (
-      <div className="min-h-screen bg-stone-100 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-stone-500">
-          <div className="w-8 h-8 border-2 border-stone-300 border-t-stone-900 rounded-full animate-spin" />
-          <p className="text-sm font-semibold">Kraunama…</p>
+      <div className="min-h-screen bg-canvas flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-muted">
+          <div className="w-8 h-8 border-2 border-hairline border-t-ink rounded-full animate-spin" />
+          <p className="text-sm">Kraunama…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-stone-100 text-stone-900 font-sans">
+    <div className="min-h-screen bg-canvas text-ink font-sans">
 
       {/* ── Header ── */}
-      <header className="sticky top-0 z-20 bg-white border-b border-stone-200 shadow-sm">
-        <div className="max-w-screen-2xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-20 bg-canvas/80 backdrop-blur-xl border-b border-hairline">
+        <div className="max-w-screen-2xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           {/* Logo */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <div className="w-8 h-8 bg-stone-900 rounded-xl flex items-center justify-center">
+            <div className="w-8 h-8 bg-ink rounded-2xl flex items-center justify-center">
               <Truck className="text-white w-4 h-4" />
             </div>
             <div>
-              <p className="text-sm font-black tracking-tight leading-none">DISPEČERIS</p>
-              <p className="text-[9px] font-semibold text-stone-400 uppercase tracking-widest">v2.0</p>
+              <p className="text-sm font-semibold tracking-tight leading-none">Dispečeris</p>
+              <p className="text-[10px] text-muted tracking-wide mt-0.5">Vestex Transport</p>
             </div>
           </div>
 
@@ -496,19 +506,19 @@ export default function App() {
           {/* Actions */}
           <div className="flex items-center gap-2 shrink-0">
             {/* DB indicator */}
-            <span className={cn("hidden sm:flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border", isSupabaseEnabled ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-stone-50 text-stone-400 border-stone-200")}>
-              {isSupabaseEnabled ? <Wifi size={11}/> : <WifiOff size={11}/>}
-              {isSupabaseEnabled ? 'Supabase' : 'LocalStorage'}
+            <span className="hidden md:flex items-center gap-1.5 text-[11px] font-medium text-muted px-2.5 py-1.5">
+              <span className={cn("w-1.5 h-1.5 rounded-full", isSupabaseEnabled ? "bg-emerald-400" : "bg-stone-300")} />
+              {isSupabaseEnabled ? 'Supabase' : 'Vietinė'}
             </span>
-            <button onClick={() => setAddCarOpen(true)} className="flex items-center gap-1.5 bg-white border border-stone-200 text-stone-700 px-3 py-1.5 rounded-xl text-xs font-semibold hover:bg-stone-50 transition-all">
+            <button onClick={() => setAddCarOpen(true)} className="flex items-center gap-1.5 bg-surface border border-hairline text-ink px-3 py-1.5 rounded-full text-xs font-medium hover:border-ink/25 transition-all">
               <Plus size={14}/><span className="hidden sm:inline">Auto</span>
             </button>
-            <button onClick={() => setAddDriverOpen(true)} className="flex items-center gap-1.5 bg-stone-900 text-white px-3 py-1.5 rounded-xl text-xs font-semibold hover:bg-stone-800 transition-all">
+            <button onClick={() => setAddDriverOpen(true)} className="flex items-center gap-1.5 bg-ink text-white px-3.5 py-1.5 rounded-full text-xs font-medium hover:bg-ink/85 transition-all">
               <UserPlus size={14}/><span className="hidden sm:inline">Vairuotojas</span>
             </button>
             {isSupabaseEnabled && (
-              <button onClick={() => { void supabase?.auth.signOut(); }} title="Atsijungti" className="flex items-center gap-1.5 bg-white border border-stone-200 text-stone-500 px-2.5 py-1.5 rounded-xl text-xs font-semibold hover:bg-stone-50 hover:text-stone-900 transition-all">
-                <LogOut size={14}/><span className="hidden sm:inline">Atsijungti</span>
+              <button onClick={() => { void supabase?.auth.signOut(); }} title="Atsijungti" className="flex items-center justify-center text-muted hover:text-ink hover:bg-stone-100 p-2 rounded-full transition-all">
+                <LogOut size={15}/>
               </button>
             )}
           </div>
@@ -522,10 +532,10 @@ export default function App() {
           <div className="space-y-8">
             {/* Stats Row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <StatCard label="Reise"        value={reiseDrivers.length}   sub={`iš ${drivers.length} viso`}          color="bg-blue-50 border-blue-100 text-blue-900" />
-              <StatCard label="Namuose"      value={namuoseDrivers.length} sub="laukia darbo"                          color="bg-emerald-50 border-emerald-100 text-emerald-900" />
-              <StatCard label="Planai"       value={activePlans.length}    sub="suplanuota"                            color="bg-violet-50 border-violet-100 text-violet-900" />
-              <StatCard label="Skubu"        value={urgentCount}           sub="reikia keitimo ≤7d"                   color={urgentCount > 0 ? "bg-red-50 border-red-200 text-red-900" : "bg-stone-50 border-stone-200 text-stone-500"} />
+              <StatCard label="Reise"        value={reiseDrivers.length}   sub={`iš ${drivers.length} viso`}          accent="bg-blue-400"    onClick={() => setActiveTab('drivers')} />
+              <StatCard label="Namuose"      value={namuoseDrivers.length} sub="laukia darbo"                          accent="bg-emerald-400" onClick={() => setActiveTab('drivers')} />
+              <StatCard label="Planai"       value={activePlans.length}    sub="suplanuota"                            accent="bg-violet-400"  onClick={() => setActiveTab('planning')} />
+              <StatCard label="Skubu"        value={urgentCount}           sub="reikia keitimo ≤7d"                   accent={urgentCount > 0 ? "bg-red-400" : "bg-stone-300"} onClick={() => setActiveTab('planning')} />
             </div>
 
             {/* Planned Replacements */}
@@ -1286,10 +1296,10 @@ export default function App() {
 
       {/* Toast */}
       {toast && (
-        <div className={cn("fixed bottom-6 right-6 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl z-[100] animate-in slide-in-from-bottom-4", toast.type === 'success' ? "bg-stone-900 text-white" : "bg-red-600 text-white")}>
-          {toast.type === 'success' ? <CheckCircle2 size={16}/> : <AlertCircle size={16}/>}
-          <span className="text-sm font-semibold">{toast.message}</span>
-          <button onClick={() => setToast(null)} className="ml-1 opacity-60 hover:opacity-100"><X size={14}/></button>
+        <div className={cn("fixed bottom-6 right-6 flex items-center gap-3 pl-4 pr-3 py-3 rounded-2xl shadow-float z-[100] animate-in slide-in-from-bottom-4", toast.type === 'success' ? "bg-ink text-white" : "bg-red-500 text-white")}>
+          {toast.type === 'success' ? <CheckCircle2 size={16} className="opacity-90"/> : <AlertCircle size={16} className="opacity-90"/>}
+          <span className="text-sm font-medium">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="ml-1 opacity-50 hover:opacity-100 transition-opacity"><X size={14}/></button>
         </div>
       )}
     </div>
@@ -1300,10 +1310,10 @@ export default function App() {
 
 function SectionHeader({ icon, title, children }: { icon: React.ReactNode; title: string; children?: React.ReactNode }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
       <div className="flex items-center gap-2.5">
         {icon}
-        <h2 className="text-lg font-bold">{title}</h2>
+        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
       </div>
       {children}
     </div>
@@ -1312,19 +1322,19 @@ function SectionHeader({ icon, title, children }: { icon: React.ReactNode; title
 
 function MonthNav({ value, onChange }: { value: Date; onChange: (d: Date) => void }) {
   return (
-    <div className="flex items-center gap-1 bg-white border border-stone-200 rounded-xl p-1">
-      <button onClick={() => onChange(subMonths(value, 1))} className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors"><ChevronLeft size={14}/></button>
-      <span className="px-3 text-xs font-bold min-w-[110px] text-center">{format(value, 'MMMM yyyy', { locale: lt })}</span>
-      <button onClick={() => onChange(addMonths(value, 1))} className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors"><ChevronRight size={14}/></button>
+    <div className="flex items-center gap-1 bg-surface border border-hairline rounded-full p-1">
+      <button onClick={() => onChange(subMonths(value, 1))} className="p-1.5 text-muted hover:text-ink hover:bg-stone-100 rounded-full transition-colors"><ChevronLeft size={14}/></button>
+      <span className="px-3 text-xs font-medium min-w-[110px] text-center capitalize">{format(value, 'MMMM yyyy', { locale: lt })}</span>
+      <button onClick={() => onChange(addMonths(value, 1))} className="p-1.5 text-muted hover:text-ink hover:bg-stone-100 rounded-full transition-colors"><ChevronRight size={14}/></button>
     </div>
   );
 }
 
 function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <div className="py-16 text-center bg-white rounded-2xl border border-dashed border-stone-200">
-      <div className="inline-flex p-4 bg-stone-50 rounded-2xl text-stone-300 mb-3">{icon}</div>
-      <p className="text-sm text-stone-400 font-medium">{text}</p>
+    <div className="py-16 text-center bg-surface rounded-2xl border border-hairline">
+      <div className="inline-flex p-4 bg-canvas rounded-2xl text-stone-300 mb-3">{icon}</div>
+      <p className="text-sm text-muted">{text}</p>
     </div>
   );
 }
@@ -1332,31 +1342,31 @@ function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }) {
 function HomeDriverCard({ driver, onSendToTrip }: { driver: Driver; onSendToTrip: () => void }) {
   const daysHome = driver.lastTripEndDate ? differenceInDays(new Date(), parseISO(driver.lastTripEndDate)) : null;
   return (
-    <div className="bg-white rounded-2xl border border-stone-200 p-4 group hover:shadow-md transition-all">
+    <div className="bg-surface rounded-2xl border border-hairline p-4 group hover:border-ink/25 transition-colors">
       <div className="flex items-start justify-between mb-3">
-        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm">
+        <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-semibold text-sm">
           {driver.name.charAt(0)}
         </div>
         <Badge variant={driver.homeStatus === 'Tvarko dokumentus' ? 'amber' : 'green'}>{driver.homeStatus}</Badge>
       </div>
-      <p className="font-bold text-sm mb-1">{driver.name}</p>
+      <p className="font-semibold text-sm mb-1">{driver.name}</p>
       <div className="flex gap-1 mb-3">
         <Badge>{driver.companyType}</Badge>
         <Badge variant="blue">{driver.specialization}</Badge>
       </div>
-      <div className="space-y-1.5 text-[10px]">
+      <div className="space-y-1.5 text-[11px]">
         <div className="flex justify-between">
-          <span className="text-stone-400 font-semibold uppercase">Gali nuo</span>
-          <span className="font-bold text-blue-600">{driver.readinessDate || '?'}</span>
+          <span className="text-muted">Gali nuo</span>
+          <span className="font-semibold text-blue-600">{driver.readinessDate || '?'}</span>
         </div>
         {daysHome !== null && (
           <div className="flex justify-between">
-            <span className="text-stone-400 font-semibold uppercase">Namuose</span>
-            <span className="font-bold">{daysHome} d.</span>
+            <span className="text-muted">Namuose</span>
+            <span className="font-semibold">{daysHome} d.</span>
           </div>
         )}
       </div>
-      <button onClick={onSendToTrip} className="w-full mt-3 py-2 bg-stone-900 text-white text-[10px] font-bold uppercase rounded-xl opacity-0 group-hover:opacity-100 transition-all translate-y-1 group-hover:translate-y-0">
+      <button onClick={onSendToTrip} className="w-full mt-3 py-2 bg-ink text-white text-[11px] font-medium rounded-xl opacity-0 group-hover:opacity-100 transition-all translate-y-1 group-hover:translate-y-0">
         Į reisą →
       </button>
     </div>
