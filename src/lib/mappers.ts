@@ -92,6 +92,9 @@ export const planToRow = (p: ReplacementPlan): Row => ({
   date: p.date,
   status: p.status,
   new_planned_return_date: p.newPlannedReturnDate ?? null,
+  change_lat: p.changeLat ?? null,
+  change_lng: p.changeLng ?? null,
+  change_location: p.changeLocation ?? null,
 });
 
 export const planFromRow = (r: Row): ReplacementPlan => ({
@@ -104,6 +107,9 @@ export const planFromRow = (r: Row): ReplacementPlan => ({
   date: String(r.date ?? ''),
   status: r.status as ReplacementPlan['status'],
   newPlannedReturnDate: (r.new_planned_return_date as string | undefined) ?? undefined,
+  changeLat: (r.change_lat as number | null) ?? null,
+  changeLng: (r.change_lng as number | null) ?? null,
+  changeLocation: (r.change_location as string | null) ?? null,
 });
 
 // ── CarAssignment ────────────────────────────────────────────────────────────

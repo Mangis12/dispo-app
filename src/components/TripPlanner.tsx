@@ -9,7 +9,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import type { Driver, ReplacementPlan, TripVehicle, TripStop, RouteInfo } from '../types';
+import type { Driver, Car, ReplacementPlan, TripVehicle, TripStop, RouteInfo } from '../types';
 
 function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
 
@@ -43,10 +43,11 @@ const mkVehicle = (idx: number): TripVehicle => ({
 interface TripPlannerProps {
   drivers: Driver[];
   plans: ReplacementPlan[];
+  cars?: Car[];
   showToast?: (msg: string, type?: 'success' | 'error') => void;
 }
 
-export default function TripPlanner({ drivers, plans, showToast }: TripPlannerProps) {
+export default function TripPlanner({ drivers, plans, cars = [], showToast }: TripPlannerProps) {
   const [tripFleet, setTripFleet] = useState<TripVehicle[]>([mkVehicle(0)]);
   const [activeVehIdx, setActiveVehIdx] = useState(0);
   const [tripSearch, setTripSearch] = useState('');
@@ -68,6 +69,26 @@ export default function TripPlanner({ drivers, plans, showToast }: TripPlannerPr
 
   const showT = (msg: string, type: 'success' | 'error' = 'success') => showToast?.(msg, type);
   const activeVeh = tripFleet[activeVehIdx] || tripFleet[0];
+
+  // ── Koordinatoriaus suplanuoti keitimo taškai (iš planų su changeLat) ──
+  const carType = (n: string) => cars.find((c) => c.number === n)?.type ?? '';
+  const loadedPlanIds = new Set(tripFleet.flatMap((v) => v.stops.map((s) => s.planId)));
+  const plannedPoints = plans.filter((p) => p.status === 'Suplanuota' && p.changeLat != null && p.changeLng != null);
+
+  // Įkelti koordinatoriaus tašką į aktyvų transportą — su jau suplanuotu vairuotoju.
+  const loadPointIntoActive = (plan: ReplacementPlan) => {
+    if (plan.changeLat == null || plan.changeLng == null) return;
+    if (loadedPlanIds.has(plan.id)) { showT('Šis taškas jau įkeltas', 'error'); return; }
+    if (activeVeh.stops.length >= activeVeh.capacity) { showT('Pasiekta transporto talpa', 'error'); return; }
+    const vid = activeVeh.id;
+    setTripFleet((p) => p.map((v) => (v.id === vid
+      ? { ...v, stops: [...v.stops, {
+          id: stopIdx.current++, lat: plan.changeLat!, lng: plan.changeLng!, city: plan.changeLocation || 'Keitimo taškas',
+          type: 'driver', driverId: plan.incomingDriverId, planId: plan.id, addWork: '',
+        }] }
+      : v)));
+    showT(`${plan.carNumber} → ${activeVeh.number || 'transportas'}`);
+  };
 
   // ── Floto pagalbininkai ──────────────────────────────────────────────────
   const updFleet = (id: string, fn: (v: TripVehicle) => TripVehicle) =>
@@ -189,8 +210,21 @@ export default function TripPlanner({ drivers, plans, showToast }: TripPlannerPr
         leafletObjs.current.push(line);
       }
     });
+
+    // Koordinatoriaus suplanuoti, dar neįkelti keitimo taškai — „šešėliniai" žymekliai.
+    plannedPoints.forEach((p) => {
+      if (loadedPlanIds.has(p.id)) return;
+      const pin = L.divIcon({
+        html: `<div style="background:#9C7B36;color:white;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px dashed white;box-shadow:0 2px 6px rgba(0,0,0,0.35);opacity:0.85"><span style="transform:rotate(45deg);font-size:9px;font-weight:900">${p.carNumber.split(' ').pop()}</span></div>`,
+        iconSize: [26, 26], iconAnchor: [13, 26], className: '',
+      });
+      const mk = L.marker([p.changeLat!, p.changeLng!], { icon: pin })
+        .addTo(map)
+        .bindPopup(`<b>⟳ ${p.carNumber}</b><br>${p.leavingDriverName} → ${p.incomingDriverName}<br>📍 ${p.changeLocation || ''}<br><i>Koordinatoriaus taškas — spausk „+ Į transportą"</i>`);
+      leafletObjs.current.push(mk);
+    });
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [tripFleet, activeVehIdx]);
+  }, [tripFleet, activeVehIdx, plans]);
 
   // ── Miesto paieška (Nominatim) ───────────────────────────────────────────
   const searchCity = async () => {
@@ -252,6 +286,46 @@ export default function TripPlanner({ drivers, plans, showToast }: TripPlannerPr
           </button>
         )}
       </div>
+
+      {/* Koordinatoriaus suplanuoti keitimo taškai */}
+      {plannedPoints.length > 0 && (
+        <div className="bg-surface rounded-2xl border border-[#9C7B36]/30 overflow-hidden shadow-sm">
+          <div className="px-4 py-3 flex items-center gap-2 bg-[#9C7B36]/10 border-b border-[#9C7B36]/20">
+            <span className="text-base">⟳</span>
+            <p className="text-sm font-bold text-[#5b4a1f]">Suplanuoti keitimo taškai</p>
+            <span className="text-xs text-[#9C7B36] font-semibold">
+              {plannedPoints.filter((p) => !loadedPlanIds.has(p.id)).length} laukia · {plannedPoints.filter((p) => loadedPlanIds.has(p.id)).length} įkelta
+            </span>
+            <span className="ml-auto text-[11px] text-slate-400">Koordinatoriaus pažymėti — vairuotojas jau priskirtas</span>
+          </div>
+          <div className="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+            {plannedPoints.map((p) => {
+              const loaded = loadedPlanIds.has(p.id);
+              return (
+                <div key={p.id} className={cn('border rounded-xl p-2.5 flex items-center gap-2.5',
+                  loaded ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-hairline')}>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-[11px] font-bold bg-[#003087] text-white px-1.5 py-0.5 rounded">{p.carNumber}</span>
+                      {carType(p.carNumber) && <span className="text-[10px] text-slate-400">{carType(p.carNumber)}</span>}
+                    </div>
+                    <p className="text-xs font-semibold truncate mt-1">📍 {p.changeLocation}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{p.incomingDriverName} ↔ {p.leavingDriverName}</p>
+                  </div>
+                  {loaded ? (
+                    <span className="shrink-0 text-[10px] font-bold text-emerald-600 inline-flex items-center gap-1">✓ Įkelta</span>
+                  ) : (
+                    <button onClick={() => loadPointIntoActive(p)}
+                      className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-[#9C7B36] hover:bg-[#876829] transition-colors">
+                      + Į transportą
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

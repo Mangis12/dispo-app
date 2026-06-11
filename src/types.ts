@@ -49,6 +49,10 @@ export interface ReplacementPlan {
   date: string;
   status: 'Suplanuota' | 'Atlikta';
   newPlannedReturnDate?: string;
+  // Koordinatoriaus numatytas keitimo taškas (kur įvyks pamaina) — eina į Kelionę.
+  changeLat?: number | null;
+  changeLng?: number | null;
+  changeLocation?: string | null;
 }
 
 export interface CarAssignment {

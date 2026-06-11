@@ -3,7 +3,7 @@ import {
   Users, Truck, Home, Calendar, Plus, ArrowRightLeft, ArrowRight,
   AlertCircle, UserPlus, LogOut, LogIn, X, Edit, History,
   CheckCircle2, User, Trash2, ChevronLeft, ChevronRight,
-  LayoutDashboard, Database, Wifi, WifiOff, Bell, Map as MapIcon, Menu, Search, Mail, Undo2
+  LayoutDashboard, Database, Wifi, WifiOff, Bell, Map as MapIcon, MapPin, Menu, Search, Mail, Undo2
 } from 'lucide-react';
 import {
   format, differenceInDays, parseISO, isBefore, isAfter,
@@ -17,6 +17,7 @@ import { twMerge } from 'tailwind-merge';
 import { supabase, isSupabaseEnabled } from './lib/supabase';
 import { loadAll, syncCollection, subscribeAll, type AllData } from './lib/repo';
 import TripPlanner from './components/TripPlanner';
+import CoordinatorBoard from './components/CoordinatorBoard';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
   ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment
@@ -40,7 +41,7 @@ const INITIAL_CARS: Car[] = [
   { id: 'c3', number: 'BCZ 555', status: 'Aktyvus', type: 'Tentas', registration: 'PL', activeFrom: '2026-01-01' },
 ];
 
-type Tab = 'dashboard' | 'planning' | 'drivers' | 'cars' | 'history' | 'calendar' | 'auto-grafikas' | 'trip';
+type Tab = 'dashboard' | 'planning' | 'drivers' | 'cars' | 'history' | 'calendar' | 'auto-grafikas' | 'trip' | 'coordinator';
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, accent, onClick }: { label: string; value: number | string; sub?: string; accent?: string; onClick?: () => void }) {
@@ -493,6 +494,17 @@ export default function App() {
     showToast('Priskyrimas ištrintas');
   };
 
+  // ── Koordinatorius: keitimo taško nustatymas / valymas plane ──
+  const setPlanChangePoint = (planId: string, lat: number, lng: number, location: string) => {
+    setPlans(prev => prev.map(p => p.id === planId ? { ...p, changeLat: lat, changeLng: lng, changeLocation: location } : p));
+    const p = plans.find(x => x.id === planId);
+    if (p) showToast(`Keitimo taškas: ${p.carNumber} → ${location}`);
+  };
+  const clearPlanChangePoint = (planId: string) => {
+    setPlans(prev => prev.map(p => p.id === planId ? { ...p, changeLat: null, changeLng: null, changeLocation: null } : p));
+    showToast('Keitimo taškas pašalintas');
+  };
+
   // ── El. laiško su savaitės planais turinys (mailto) ──
   const buildPlansEmail = (group: CarType, weeks: 1 | 2) => {
     const from = startOfWeek(new Date(), { weekStartsOn: 1 });
@@ -570,6 +582,8 @@ export default function App() {
   const reiseDrivers  = drivers.filter(d => d.status === 'Reise');
   const namuoseDrivers = drivers.filter(d => d.status === 'Namuose').sort((a, b) => (a.readinessDate || '').localeCompare(b.readinessDate || ''));
   const activePlans   = plans.filter(p => p.status === 'Suplanuota');
+  // Planai be nustatyto keitimo taško — koordinatoriaus „darbų" skaičius.
+  const coordinatorPending = activePlans.filter(p => p.changeLat == null).length;
 
   if (!loaded) {
     return (
@@ -591,6 +605,7 @@ export default function App() {
     history:         { title: 'Istorija',     subtitle: 'Visų veiksmų žurnalas' },
     calendar:        { title: 'Kalendorius',  subtitle: 'Keitimai pagal mėnesį' },
     'auto-grafikas': { title: 'Grafikas',     subtitle: 'Automobilių užimtumo juosta' },
+    coordinator:     { title: 'Koordinatorius', subtitle: 'Keitimo taškai žemėlapyje — eina į Kelionę' },
     trip:            { title: 'Kelionė',      subtitle: 'Maršrutų ir keitimo logistika' },
   };
   const meta = pageMeta[activeTab];
@@ -623,6 +638,7 @@ export default function App() {
             <NavItem active={activeTab === 'planning'} onClick={() => go('planning')} icon={<ArrowRightLeft size={17}/>} label="Planavimas" badge={urgentCount} />
             <NavItem active={activeTab === 'calendar'} onClick={() => go('calendar')} icon={<Calendar size={17}/>} label="Kalendorius" />
             <NavItem active={activeTab === 'auto-grafikas'} onClick={() => go('auto-grafikas')} icon={<LayoutDashboard size={17}/>} label="Grafikas" />
+            <NavItem active={activeTab === 'coordinator'} onClick={() => go('coordinator')} icon={<MapPin size={17}/>} label="Koordinatorius" badge={coordinatorPending} />
             <NavItem active={activeTab === 'trip'} onClick={() => go('trip')} icon={<MapIcon size={17}/>} label="Kelionė" />
           </NavGroup>
           <NavGroup label="Katalogas">
@@ -1305,9 +1321,18 @@ export default function App() {
           </div>
         )}
 
+        {/* ══════════════════ KOORDINATORIUS (keitimo taškai) ══════════════════ */}
+        {activeTab === 'coordinator' && (
+          <CoordinatorBoard
+            plans={plans} cars={cars} drivers={drivers}
+            onSetPoint={setPlanChangePoint} onClearPoint={clearPlanChangePoint}
+            onGoTrip={() => setActiveTab('trip')}
+          />
+        )}
+
         {/* ══════════════════ KELIONĖ (žemėlapis) ══════════════════ */}
         {activeTab === 'trip' && (
-          <TripPlanner drivers={drivers} plans={plans} showToast={(msg, type) => setToast({ message: msg, type: type ?? 'success' })} />
+          <TripPlanner drivers={drivers} plans={plans} cars={cars} showToast={(msg, type) => setToast({ message: msg, type: type ?? 'success' })} />
         )}
 
         {/* Reset */}
