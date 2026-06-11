@@ -511,6 +511,34 @@ export default function App() {
     showToast(`${a.carNumber}: pastumta ${deltaDays > 0 ? '+' : ''}${deltaDays} d.`);
   };
 
+  // ── Grafiko „drag": juostos krašto tempimas (pradžia ARBA pabaiga atskirai) ──
+  const resizeAssignment = (a: CarAssignment, edge: 'start' | 'end', deltaDays: number) => {
+    if (!deltaDays) return;
+    if (edge === 'start') {
+      const ns = shiftISO(a.startDate, deltaDays);
+      if (a.endDate && !isBefore(parseISO(ns), parseISO(a.endDate))) return; // pradžia < pabaiga
+      setCarAssignments(prev => prev.map(x => x.id === a.id ? { ...x, startDate: ns } : x));
+      if (a.endDate == null) setDrivers(prev => prev.map(d => d.id === a.driverId ? { ...d, startDate: ns } : d));
+      logHistory(a.driverId, a.driverName, 'Grafikas pakoreguotas', `Auto: ${a.carNumber} pradžia → ${ns}`, a.carNumber, ns);
+      showToast(`${a.carNumber}: pradžia ${ns}`);
+    } else {
+      if (a.endDate) {
+        const ne = shiftISO(a.endDate, deltaDays);
+        if (!isAfter(parseISO(ne), parseISO(a.startDate))) return; // pabaiga > pradžia
+        setCarAssignments(prev => prev.map(x => x.id === a.id ? { ...x, endDate: ne } : x));
+        showToast(`${a.carNumber}: pabaiga ${ne}`);
+      } else {
+        // Atviras reisas: pabaigą lemia numatoma grįžimo data (plannedReturnDate).
+        const drv = drivers.find(d => d.id === a.driverId);
+        if (!drv?.plannedReturnDate) return;
+        const ne = shiftISO(drv.plannedReturnDate, deltaDays);
+        if (!isAfter(parseISO(ne), parseISO(a.startDate))) return;
+        setDrivers(prev => prev.map(d => d.id === a.driverId ? { ...d, plannedReturnDate: ne } : d));
+        showToast(`${a.carNumber}: grįžimas → ${ne}`);
+      }
+    }
+  };
+
   // ── Grafiko „drag": planuojamo keitimo data (horizontaliai) ──
   const movePlanDate = (planId: string, deltaDays: number) => {
     if (!deltaDays) return;
@@ -836,7 +864,7 @@ export default function App() {
               <SectionHeader icon={<LayoutDashboard size={18} className="text-violet-500"/>} title="Vairuotojų grafikas">
                 <MonthNav value={selectedMonth} onChange={setSelectedMonth} />
               </SectionHeader>
-              <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} onEditAssignment={setEditAssignment} onMoveAssignment={moveAssignment} onMovePlanDate={movePlanDate} onMovePlanToCar={movePlanToCar} />
+              <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} onEditAssignment={setEditAssignment} onMoveAssignment={moveAssignment} onMovePlanDate={movePlanDate} onMovePlanToCar={movePlanToCar} onResizeAssignment={resizeAssignment} />
             </section>
           </div>
         )}
@@ -1360,7 +1388,7 @@ export default function App() {
             <div className="flex items-center justify-end">
               <MonthNav value={selectedMonth} onChange={setSelectedMonth} />
             </div>
-            <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} showCars onEditAssignment={setEditAssignment} onMoveAssignment={moveAssignment} onMovePlanDate={movePlanDate} onMovePlanToCar={movePlanToCar} />
+            <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} showCars onEditAssignment={setEditAssignment} onMoveAssignment={moveAssignment} onMovePlanDate={movePlanDate} onMovePlanToCar={movePlanToCar} onResizeAssignment={resizeAssignment} />
           </div>
         )}
 
@@ -1775,10 +1803,11 @@ type TLSegment = {
   planCar?: string;        // plano dabartinė mašina
 };
 
-function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars, onEditAssignment, onMoveAssignment, onMovePlanDate, onMovePlanToCar }: {
+function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars, onEditAssignment, onMoveAssignment, onResizeAssignment, onMovePlanDate, onMovePlanToCar }: {
   drivers: Driver[]; cars: Car[]; plans: ReplacementPlan[]; carAssignments: CarAssignment[]; month: Date; showCars?: boolean;
   onEditAssignment?: (a: CarAssignment) => void;
   onMoveAssignment?: (a: CarAssignment, deltaDays: number) => void;
+  onResizeAssignment?: (a: CarAssignment, edge: 'start' | 'end', deltaDays: number) => void;
   onMovePlanDate?: (planId: string, deltaDays: number) => void;
   onMovePlanToCar?: (planId: string, newCar: string) => void;
 }) {
@@ -1788,20 +1817,30 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
   const days       = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const pct        = (n: number) => `${(n / totalDays) * 100}%`;
 
-  // ── Drag (pelės tempimas): kadencijos juostos pastūmimas / plano perkėlimas ──
-  const dragInfo = useRef<null | { seg: TLSegment; segKey: string; startX: number; startY: number; dayPx: number; moved: boolean }>(null);
-  const [drag, setDrag] = useState<null | { segKey: string; dx: number; dy: number; deltaDays: number; targetCar: string | null }>(null);
+  // ── Drag (pelės tempimas): juostos pastūmimas / kraštų tempimas / plano perkėlimas ──
+  type DragMode = 'move' | 'start' | 'end';
+  const dragInfo = useRef<null | { seg: TLSegment; segKey: string; startX: number; startY: number; dayPx: number; moved: boolean; mode: DragMode }>(null);
+  const [drag, setDrag] = useState<null | { segKey: string; dx: number; dy: number; deltaDays: number; targetCar: string | null; mode: DragMode }>(null);
   const canDrag = (s: TLSegment) =>
-    (s.type === 'active' && !!s.assignment && !!onMoveAssignment) ||
+    (s.type === 'active' && !!s.assignment && (!!onMoveAssignment || !!onResizeAssignment)) ||
     (s.type === 'planned' && !!s.planId && (!!onMovePlanDate || !!onMovePlanToCar));
 
+  const EDGE = 11; // krašto „rankenėlės" plotis px
   const onSegDown = (e: React.PointerEvent, seg: TLSegment, segKey: string) => {
     if (!canDrag(seg)) return;
     const track = (e.currentTarget as HTMLElement).closest('[data-tl-track]') as HTMLElement | null;
     if (!track) return;
     e.preventDefault();
     const dayPx = track.getBoundingClientRect().width / totalDays;
-    dragInfo.current = { seg, segKey, startX: e.clientX, startY: e.clientY, dayPx, moved: false };
+    // Kraštai → resize (tik aktyvioms juostoms); vidurys → move.
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const offX = e.clientX - rect.left;
+    let mode: DragMode = 'move';
+    if (seg.type === 'active' && onResizeAssignment) {
+      if (offX <= EDGE) mode = 'start';
+      else if (offX >= rect.width - EDGE) mode = 'end';
+    }
+    dragInfo.current = { seg, segKey, startX: e.clientX, startY: e.clientY, dayPx, moved: false, mode };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
   const onSegMove = (e: React.PointerEvent) => {
@@ -1811,11 +1850,11 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
     di.moved = true;
     const deltaDays = Math.round(dx / di.dayPx);
     let targetCar: string | null = null;
-    if (di.seg.type === 'planned' && showCars) {
+    if (di.seg.type === 'planned' && di.mode === 'move' && showCars) {
       const el = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest('[data-car-number]') as HTMLElement | null;
       targetCar = el?.getAttribute('data-car-number') || null;
     }
-    setDrag({ segKey: di.segKey, dx, dy, deltaDays, targetCar });
+    setDrag({ segKey: di.segKey, dx, dy, deltaDays, targetCar, mode: di.mode });
   };
   const onSegUp = (e: React.PointerEvent, seg: TLSegment) => {
     const di = dragInfo.current; const d = drag;
@@ -1828,7 +1867,8 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
     }
     const deltaDays = d?.deltaDays ?? 0;
     if (seg.type === 'active' && seg.assignment) {
-      onMoveAssignment?.(seg.assignment, deltaDays);
+      if (di.mode === 'move') onMoveAssignment?.(seg.assignment, deltaDays);
+      else onResizeAssignment?.(seg.assignment, di.mode, deltaDays);
     } else if (seg.type === 'planned' && seg.planId) {
       if (d?.targetCar && d.targetCar !== seg.planCar) onMovePlanToCar?.(seg.planId, d.targetCar);
       else if (deltaDays !== 0) onMovePlanDate?.(seg.planId, deltaDays);
@@ -1962,8 +2002,16 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
                       const segKey = `${(d || c)!.id}:${idx}`;
                       const draggable = canDrag(seg);
                       const isDragging = drag?.segKey === segKey;
-                      // Aktyvų segmentą stumiam horizontaliai snap'inant prie dienų; planą — laisvai (transl).
-                      const activeShiftLeft = isDragging && seg.type === 'active' ? drag!.deltaDays : 0;
+                      const resizable = seg.type === 'active' && !!onResizeAssignment && !!seg.assignment;
+                      // Tempimo preview: aktyvų segmentą snap'inam prie dienų pagal režimą; planą — laisvai (transl).
+                      let leftIdx = seg.startIdx, wDays = widthDays;
+                      if (isDragging && seg.type === 'active') {
+                        const dd = drag!.deltaDays;
+                        if (drag!.mode === 'move') leftIdx += dd;
+                        else if (drag!.mode === 'start') { leftIdx += dd; wDays -= dd; }
+                        else if (drag!.mode === 'end') { wDays += dd; }
+                        if (wDays < 1) wDays = 1;
+                      }
                       const dragStyle: React.CSSProperties = isDragging
                         ? (seg.type === 'planned' ? { transform: `translate(${drag!.dx}px, ${drag!.dy}px)`, zIndex: 50 } : { zIndex: 50 })
                         : {};
@@ -1974,7 +2022,7 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
                           onPointerMove={onSegMove}
                           onPointerUp={(e) => onSegUp(e, seg)}
                           className={cn(
-                            "absolute rounded-lg flex items-center gap-1 px-2 overflow-hidden shadow-card",
+                            "absolute rounded-lg flex items-center gap-1 px-2 overflow-hidden shadow-card group/seg",
                             !isDragging && "transition-all",
                             // Atskiros juostos: faktinis viršuje, planuojamas apačioje — kad nepersidengtų
                             planned ? "top-9 h-4 border border-dashed border-white/45" : "top-2 h-7",
@@ -1984,9 +2032,14 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
                             draggable ? "cursor-grab active:cursor-grabbing touch-none select-none" : clickable && "cursor-pointer",
                             !isDragging && draggable && "hover:opacity-100 hover:brightness-110",
                           )}
-                          style={{ left: `calc(${pct(seg.startIdx + activeShiftLeft)})`, width: `calc(${pct(widthDays)} - 2px)`, background: planned ? '#B08A3C' : seg.color, color: 'white', ...dragStyle }}
-                          title={`${seg.name} · nuo ${seg.from}${seg.to ? `${seg.estimated ? ' · numatoma grįžti iki ' : ' iki '}${seg.to}` : ' (pabaiga nenurodyta)'}${planned ? ' · planuojama' : isCurrent ? ' · dabartinis' : ' · istorija'}${draggable ? (planned ? ' · tempk ant kitos mašinos arba šonus' : ' · tempk pelę / spausk redaguoti') : ''}`}
+                          style={{ left: `calc(${pct(leftIdx)})`, width: `calc(${pct(wDays)} - 2px)`, background: planned ? '#B08A3C' : seg.color, color: 'white', ...dragStyle }}
+                          title={`${seg.name} · nuo ${seg.from}${seg.to ? `${seg.estimated ? ' · numatoma grįžti iki ' : ' iki '}${seg.to}` : ' (pabaiga nenurodyta)'}${planned ? ' · planuojama' : isCurrent ? ' · dabartinis' : ' · istorija'}${resizable ? ' · tempk kraštus (pradžia/pabaiga) arba vidurį' : planned ? ' · tempk ant kitos mašinos arba šonus' : ''}`}
                         >
+                          {/* Kraštų rankenėlės — pradžia/pabaiga atskirai (cursor: ew-resize) */}
+                          {resizable && <>
+                            <div className="absolute left-0 top-0 bottom-0 w-2.5 cursor-ew-resize z-10 flex items-center justify-start pl-0.5 opacity-0 group-hover/seg:opacity-100 transition-opacity"><span className="w-0.5 h-3.5 rounded bg-white/70" /></div>
+                            <div className="absolute right-0 top-0 bottom-0 w-2.5 cursor-ew-resize z-10 flex items-center justify-end pr-0.5 opacity-0 group-hover/seg:opacity-100 transition-opacity"><span className="w-0.5 h-3.5 rounded bg-white/70" /></div>
+                          </>}
                           {planned && <span className="text-[8px] leading-none shrink-0">⟳</span>}
                           <span className="truncate text-[10px] font-semibold leading-none">{seg.name}</span>
                           {seg.to && !planned && widthDays > 4 && (
