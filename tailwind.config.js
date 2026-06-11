@@ -8,22 +8,28 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['Fraunces', 'Georgia', 'serif'], // premium antikva — lого ir antraštės
         mono: ['JetBrains Mono', 'monospace'],
-        serif: ['Georgia', 'serif'],
+        serif: ['Fraunces', 'Georgia', 'serif'],
       },
       colors: {
-        // Skandinaviško minimalizmo paletė
-        canvas: '#F4F3EF',   // šilta pilkšvai balta drobė (puslapio fonas)
-        surface: '#FFFFFF',  // kortelės
-        ink: '#1B1A18',      // beveik juodas tekstas
-        hairline: '#E7E4DD', // švelni šilta linija (borders)
-        muted: '#8B8780',    // antrinis tekstas
-        accent: '#1B1A18',   // vienintelis akcentas — juodas (Scandi)
+        // Etihad įkvėpta premium paletė: dykumos smėlis + bronza/auksas + grafitas
+        canvas: '#F2ECE1',   // šiltas smėlio/kremo fonas
+        surface: '#FBF8F2',  // švelnus kremas — kortelės
+        ink: '#272219',      // šiltas espresso grafitas (tekstas / tamsūs mygtukai)
+        hairline: '#E6DDCC', // šilta smėlio linija (borders)
+        muted: '#938876',    // šiltas taupe — antrinis tekstas
+        gold: {
+          DEFAULT: '#9C7B36', // gili bronza/auksas — vienintelis prabangos akcentas
+          soft: '#BE9B5A',    // šviesesnis auksas
+          pale: '#EDE2C9',    // labai šviesus auksinis fonas
+        },
+        accent: '#9C7B36',
       },
       boxShadow: {
-        // Subtilūs šešėliai vietoj sunkių
-        card: '0 1px 2px rgba(27, 26, 24, 0.04)',
-        float: '0 8px 30px rgba(27, 26, 24, 0.12)',
+        // Subtilūs, šilti šešėliai
+        card: '0 1px 2px rgba(39, 34, 25, 0.05)',
+        float: '0 12px 40px rgba(39, 34, 25, 0.14)',
       },
       gridTemplateColumns: {
         '31': 'repeat(31, minmax(0, 1fr))',

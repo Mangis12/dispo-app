@@ -237,7 +237,7 @@ export default function TripPlanner({ drivers, plans, showToast }: TripPlannerPr
         {tripFleet.map((veh, i) => (
           <button key={veh.id} onClick={() => setActiveVehIdx(i)}
             className={cn('flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all',
-              i === activeVehIdx ? 'text-white shadow-md border-transparent' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300')}
+              i === activeVehIdx ? 'text-white shadow-md border-transparent' : 'bg-surface text-slate-600 border-hairline hover:border-slate-300')}
             style={i === activeVehIdx ? { background: veh.color } : { borderLeft: `3px solid ${veh.color}` }}>
             <span style={{ color: i === activeVehIdx ? 'white' : veh.color }}>🚐</span>
             <span>{veh.number || `#${i + 1}`}</span>
@@ -258,7 +258,7 @@ export default function TripPlanner({ drivers, plans, showToast }: TripPlannerPr
         {/* LEFT column */}
         <div className="space-y-4">
           {/* Vehicle details */}
-          <div className="bg-white rounded-2xl border-2 p-4 shadow-sm space-y-3" style={{ borderColor: activeVeh.color }}>
+          <div className="bg-surface rounded-2xl border-2 p-4 shadow-sm space-y-3" style={{ borderColor: activeVeh.color }}>
             <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
               <div className="w-4 h-4 rounded-full shrink-0" style={{ background: activeVeh.color }} />
               <h3 className="font-bold text-[#003087] text-sm">Transporto priemonė #{activeVehIdx + 1}</h3>
@@ -290,7 +290,7 @@ export default function TripPlanner({ drivers, plans, showToast }: TripPlannerPr
           </div>
 
           {/* Mode toggle + City search */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
+          <div className="bg-surface rounded-2xl border border-hairline p-4 shadow-sm space-y-3">
             <div className="flex items-center gap-2">
               <p className="text-xs font-bold text-[#003087] shrink-0">Pridėti:</p>
               <div className="flex bg-slate-100 p-1 rounded-xl gap-1 flex-1">
@@ -323,7 +323,7 @@ export default function TripPlanner({ drivers, plans, showToast }: TripPlannerPr
           </div>
 
           {/* Stops list */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
+          <div className="bg-surface rounded-2xl border border-hairline p-4 shadow-sm space-y-3">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
               <h3 className="font-bold text-[#003087] text-sm">Stotelės</h3>
               <span className="text-slate-400 text-xs">({activeVeh.stops.length}/{activeVeh.capacity})</span>
@@ -335,7 +335,7 @@ export default function TripPlanner({ drivers, plans, showToast }: TripPlannerPr
             </div>
 
             {activeVeh.stops.length === 0 ? (
-              <div className="py-8 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400">
+              <div className="py-8 text-center border-2 border-dashed border-hairline rounded-xl text-slate-400">
                 <p className="text-2xl mb-1">📍</p>
                 <p className="text-xs font-medium">Spusk ant žemėlapio arba ieškok miesto</p>
               </div>
@@ -350,7 +350,7 @@ export default function TripPlanner({ drivers, plans, showToast }: TripPlannerPr
                   const isTask = stop.type === 'task';
                   return (
                     <div key={stop.id} className={cn('border rounded-xl p-3 space-y-2.5',
-                      isTask ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200')}>
+                      isTask ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-hairline')}>
                       <div className="flex items-center gap-2">
                         <div className={cn('w-6 h-6 text-white text-xs font-black flex items-center justify-center shrink-0',
                           isTask ? 'rounded-md bg-amber-500' : 'rounded-full')}
@@ -434,7 +434,7 @@ export default function TripPlanner({ drivers, plans, showToast }: TripPlannerPr
 
         {/* RIGHT: Map */}
         <div>
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm" style={{ height: '560px' }}>
+          <div className="bg-surface rounded-2xl border border-hairline overflow-hidden shadow-sm" style={{ height: '560px' }}>
             <div className="px-4 py-3 flex items-center gap-2 flex-wrap" style={{ background: 'linear-gradient(90deg,#003087 0%,#004ab5 100%)' }}>
               <span className="text-white text-sm font-bold">🗺️ Žemėlapis</span>
               <div className="flex items-center gap-1.5 flex-wrap ml-2">
@@ -453,7 +453,7 @@ export default function TripPlanner({ drivers, plans, showToast }: TripPlannerPr
 
       {/* INSTRUCTIONS (all vehicles) */}
       {tripFleet.some((v) => v.stops.length > 0 || v.number) && (
-        <div className="bg-white rounded-2xl border border-[#003087]/15 overflow-hidden shadow-sm">
+        <div className="bg-surface rounded-2xl border border-[#003087]/15 overflow-hidden shadow-sm">
           <div className="px-5 py-4 flex items-center gap-3" style={{ background: 'linear-gradient(90deg,#003087 0%,#004ab5 100%)' }}>
             <span className="text-lg">📋</span>
             <div>
@@ -535,13 +535,13 @@ export default function TripPlanner({ drivers, plans, showToast }: TripPlannerPr
                           ) : (
                             <div className="flex gap-3 items-start">
                               <div className="w-7 h-7 rounded-full text-white text-xs font-black flex items-center justify-center shrink-0" style={{ background: drv ? veh.color : '#94a3b8' }}>{i + 1}</div>
-                              <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
+                              <div className="flex-1 bg-slate-50 border border-hairline rounded-xl p-3 space-y-1.5">
                                 <div className="flex items-start justify-between gap-2 flex-wrap">
                                   <p className="text-sm font-bold text-[#003087]">📍 {stop.city}</p>
                                   {replacesCar && <span className="font-mono text-xs font-black bg-[#003087] text-white px-2 py-0.5 rounded">{replacesCar}</span>}
                                 </div>
                                 <p className="text-xs font-mono text-slate-400">{stop.lat.toFixed(4)}, {stop.lng.toFixed(4)}</p>
-                                <div className="border-t border-slate-200 pt-1.5 space-y-1">
+                                <div className="border-t border-hairline pt-1.5 space-y-1">
                                   <div className="flex items-center gap-2 text-xs">
                                     <span className="text-emerald-600 font-bold">↓ Išlipa:</span>
                                     <span className={cn('font-semibold', drv ? 'text-[#003087]' : 'text-slate-400 italic')}>{drv ? drv.name : 'nepriskirta'}</span>
@@ -588,14 +588,14 @@ export default function TripPlanner({ drivers, plans, showToast }: TripPlannerPr
       {pendingTaskStop && (
         <div className="fixed inset-0 bg-[#003087]/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
           onClick={(e) => e.target === e.currentTarget && setPendingTaskStop(null)}>
-          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border border-amber-200">
+          <div className="bg-surface w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border border-amber-200">
             <div className="px-5 py-4 flex items-center gap-3 bg-amber-500">
               <span className="text-2xl">📦</span>
               <div>
                 <p className="text-white font-black text-sm">Nauja užduotis</p>
                 <p className="text-white/70 text-xs">{pendingTaskStop.city}</p>
               </div>
-              <button onClick={() => setPendingTaskStop(null)} className="ml-auto p-1.5 hover:bg-white/20 rounded-lg text-white/70">✕</button>
+              <button onClick={() => setPendingTaskStop(null)} className="ml-auto p-1.5 hover:bg-surface/20 rounded-lg text-white/70">✕</button>
             </div>
             <div className="p-5 space-y-4">
               <p className="text-xs text-slate-500">📍 <span className="font-mono">{pendingTaskStop.lat.toFixed(4)}, {pendingTaskStop.lng.toFixed(4)}</span></p>
@@ -610,7 +610,7 @@ export default function TripPlanner({ drivers, plans, showToast }: TripPlannerPr
             </div>
             <div className="px-5 pb-5 flex gap-3">
               <button onClick={() => setPendingTaskStop(null)}
-                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50">
+                className="flex-1 py-2.5 border border-hairline rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-50">
                 Atšaukti
               </button>
               <button onClick={commitTask}

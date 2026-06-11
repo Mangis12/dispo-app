@@ -57,8 +57,8 @@ function StatCard({ label, value, sub, accent, onClick }: { label: string; value
         <span className={cn("w-1.5 h-1.5 rounded-full", accent ?? "bg-stone-300")} />
         <p className="text-[11px] font-medium uppercase tracking-wider text-muted">{label}</p>
       </div>
-      <p className="text-[2rem] leading-none font-semibold tracking-tight text-ink">{value}</p>
-      {sub && <p className="text-xs text-muted mt-2">{sub}</p>}
+      <p className="text-[2.25rem] leading-none font-display font-medium tracking-tight text-ink">{value}</p>
+      {sub && <p className="text-xs text-muted mt-2.5">{sub}</p>}
     </Tag>
   );
 }
@@ -105,8 +105,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const inputCls = "w-full bg-canvas border border-hairline rounded-xl px-3.5 py-2.5 text-sm text-ink placeholder:text-stone-400 focus:outline-none focus:bg-white focus:border-ink/40 transition-all";
-const selectCls = "w-full bg-canvas border border-hairline rounded-xl px-3.5 py-2.5 text-sm text-ink focus:outline-none focus:bg-white focus:border-ink/40 transition-all appearance-none";
+const inputCls = "w-full bg-canvas border border-hairline rounded-xl px-3.5 py-2.5 text-sm text-ink placeholder:text-stone-400 focus:outline-none focus:bg-surface focus:border-ink/40 transition-all";
+const selectCls = "w-full bg-canvas border border-hairline rounded-xl px-3.5 py-2.5 text-sm text-ink focus:outline-none focus:bg-surface focus:border-ink/40 transition-all appearance-none";
 
 // ─── Tab Button ───────────────────────────────────────────────────────────────
 function TabBtn({ active, onClick, icon, label, badge }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; badge?: number }) {
@@ -115,7 +115,7 @@ function TabBtn({ active, onClick, icon, label, badge }: { active: boolean; onCl
       onClick={onClick}
       className={cn(
         "relative flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap",
-        active ? "bg-ink text-white" : "text-muted hover:text-ink hover:bg-stone-100"
+        active ? "bg-ink text-white ring-1 ring-gold/40 shadow-card" : "text-muted hover:text-ink hover:bg-hairline/50"
       )}
     >
       {icon}
@@ -498,12 +498,12 @@ export default function App() {
         <div className="max-w-screen-2xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           {/* Logo */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <div className="w-8 h-8 bg-ink rounded-2xl flex items-center justify-center">
-              <Truck className="text-white w-4 h-4" />
+            <div className="w-9 h-9 bg-ink rounded-2xl flex items-center justify-center ring-1 ring-gold/30">
+              <Truck className="text-gold-soft w-4 h-4" />
             </div>
             <div>
-              <p className="text-sm font-semibold tracking-tight leading-none">Dispečeris</p>
-              <p className="text-[10px] text-muted tracking-wide mt-0.5">Vestex Transport</p>
+              <p className="text-[17px] font-display font-medium tracking-tight leading-none">Dispečeris</p>
+              <p className="text-[10px] text-muted tracking-[0.12em] uppercase mt-1">Vestex Transport</p>
             </div>
           </div>
 
@@ -657,11 +657,11 @@ export default function App() {
         {/* ══════════════════ PLANNING ══════════════════ */}
         {activeTab === 'planning' && (
           <div className="space-y-6">
-            <h2 className="text-xl font-bold">Pakeitimų planavimas</h2>
+            <h2 className="text-2xl font-display font-medium tracking-tight">Pakeitimų planavimas</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left: who to replace */}
-              <div className="bg-white rounded-2xl border border-stone-200 p-6 space-y-5">
-                <div className="flex items-center gap-2 border-b border-stone-100 pb-4">
+              <div className="bg-surface rounded-2xl border border-hairline p-6 space-y-5">
+                <div className="flex items-center gap-2 border-b border-hairline pb-4">
                   <LogOut size={16} className="text-red-500"/>
                   <h3 className="font-bold">Ką pakeisti?</h3>
                 </div>
@@ -739,8 +739,8 @@ export default function App() {
               </div>
 
               {/* Right: give work to driver */}
-              <div className="bg-white rounded-2xl border border-stone-200 p-6 space-y-5">
-                <div className="flex items-center gap-2 border-b border-stone-100 pb-4">
+              <div className="bg-surface rounded-2xl border border-hairline p-6 space-y-5">
+                <div className="flex items-center gap-2 border-b border-hairline pb-4">
                   <LogIn size={16} className="text-emerald-500"/>
                   <h3 className="font-bold">Kam duoti darbą?</h3>
                 </div>
@@ -768,7 +768,7 @@ export default function App() {
                       const isPlanned = plans.some(p => p.carNumber === d.currentCar && p.date === targetWorkDate && p.status === 'Suplanuota');
                       const late = d.plannedReturnDate && isBefore(parseISO(d.plannedReturnDate), new Date());
                       return (
-                        <div key={d.id} className={cn("flex items-center justify-between p-3 rounded-xl border", isPlanned ? "bg-emerald-50 border-emerald-200" : "bg-stone-50 border-stone-100 hover:border-stone-300")}>
+                        <div key={d.id} className={cn("flex items-center justify-between p-3 rounded-xl border", isPlanned ? "bg-emerald-50 border-emerald-200" : "bg-canvas border-hairline hover:border-stone-300")}>
                           <div>
                             <p className="text-sm font-semibold">{d.currentCar} — {d.name}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
@@ -781,7 +781,7 @@ export default function App() {
                               if (!selectedHomeDriverId) { showToast('Pasirinkite vairuotoją', 'error'); return; }
                               const incoming = drivers.find(x => x.id === selectedHomeDriverId);
                               setConfirmData({ carNumber: d.currentCar, leavingId: d.id, incomingId: selectedHomeDriverId, date: targetWorkDate, driverName: incoming?.name || '' });
-                            }} className="bg-stone-900 text-white text-xs font-bold px-3 py-1.5 rounded-xl hover:bg-stone-700 transition-colors">
+                            }} className="bg-ink text-white text-xs font-bold px-3 py-1.5 rounded-xl hover:bg-ink/85 transition-colors">
                               Planuoti
                             </button>
                           )}
@@ -795,13 +795,13 @@ export default function App() {
 
             {/* Active Plans List */}
             {activePlans.length > 0 && (
-              <div className="bg-white rounded-2xl border border-stone-200 p-6">
+              <div className="bg-surface rounded-2xl border border-hairline p-6">
                 <p className="text-sm font-bold mb-4">Visi aktyvūs planai ({activePlans.length})</p>
                 <div className="space-y-2">
                   {activePlans.sort((a,b) => a.date.localeCompare(b.date)).map(plan => (
-                    <div key={plan.id} className="flex items-center justify-between p-3 bg-stone-50 rounded-xl border border-stone-100">
+                    <div key={plan.id} className="flex items-center justify-between p-3 bg-canvas rounded-xl border border-hairline">
                       <div className="flex items-center gap-3">
-                        <span className="font-mono text-xs font-bold bg-stone-900 text-white px-2 py-0.5 rounded">{plan.carNumber}</span>
+                        <span className="font-mono text-xs font-bold bg-ink text-white px-2 py-0.5 rounded">{plan.carNumber}</span>
                         <div>
                           <p className="text-xs font-semibold">{plan.leavingDriverName} → {plan.incomingDriverName}</p>
                           <p className="text-[10px] text-stone-400">{plan.date}{plan.newPlannedReturnDate ? ` • dirbs iki: ${plan.newPlannedReturnDate}` : ''}</p>
@@ -823,7 +823,7 @@ export default function App() {
         {activeTab === 'drivers' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <h2 className="text-xl font-bold">Vairuotojai ({drivers.length})</h2>
+              <h2 className="text-2xl font-display font-medium tracking-tight">Vairuotojai ({drivers.length})</h2>
               <div className="flex flex-wrap gap-2">
                 <select className={cn(selectCls, 'w-auto')} value={driverFilter.companyType} onChange={e => setDriverFilter(p => ({ ...p, companyType: e.target.value as RegistrationType | '' }))}>
                   <option value="">Visos įmonės</option>
@@ -840,10 +840,10 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden overflow-x-auto">
+            <div className="bg-surface rounded-2xl border border-hairline overflow-hidden overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-stone-900 text-white text-left">
+                  <tr className="bg-ink text-white text-left">
                     <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Vairuotojas</th>
                     <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Įmonė / Tipas</th>
                     <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Būsena</th>
@@ -862,7 +862,7 @@ export default function App() {
                     const plan = plans.find(p => p.status === 'Suplanuota' && (p.leavingDriverId === d.id || p.incomingDriverId === d.id));
                     const isLate = d.status === 'Reise' && d.plannedReturnDate && isBefore(parseISO(d.plannedReturnDate), new Date());
                     return (
-                      <tr key={d.id} className="hover:bg-stone-50 transition-colors">
+                      <tr key={d.id} className="hover:bg-canvas transition-colors">
                         <td className="px-4 py-3">
                           <div className="font-semibold">{d.name}</div>
                           <div className="text-[10px] text-stone-400 font-mono">{d.phone}</div>
@@ -891,7 +891,7 @@ export default function App() {
                             {d.status === 'Reise' ? (
                               <button onClick={() => { setSelectedDriverForHome(d); setHomeOpen(true); }} className="px-2.5 py-1 bg-emerald-500 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-600 transition-colors">Namo</button>
                             ) : (
-                              <button onClick={() => { setSelectedDriverForTrip(d); setTripOpen(true); }} className="px-2.5 py-1 bg-stone-900 text-white text-[10px] font-bold rounded-lg hover:bg-stone-700 transition-colors">Į reisą</button>
+                              <button onClick={() => { setSelectedDriverForTrip(d); setTripOpen(true); }} className="px-2.5 py-1 bg-ink text-white text-[10px] font-bold rounded-lg hover:bg-ink/85 transition-colors">Į reisą</button>
                             )}
                             <button onClick={() => { setSelectedDriverForEdit(d); setEditDriverOpen(true); }} className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all"><Edit size={13}/></button>
                             <button onClick={() => deleteDriver(d.id)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Trash2 size={13}/></button>
@@ -910,7 +910,7 @@ export default function App() {
         {activeTab === 'cars' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <h2 className="text-xl font-bold">Automobilių parkas ({cars.length})</h2>
+              <h2 className="text-2xl font-display font-medium tracking-tight">Automobilių parkas ({cars.length})</h2>
               <div className="flex gap-2 flex-wrap">
                 <select className={cn(selectCls, 'w-auto')} value={carFilter.registration} onChange={e => setCarFilter(p => ({ ...p, registration: e.target.value as RegistrationType | '' }))}>
                   <option value="">Visos registracijos</option>
@@ -936,7 +936,7 @@ export default function App() {
                 const driver = drivers.find(d => d.currentCar === car.number);
                 const plan   = plans.find(p => p.status === 'Suplanuota' && p.carNumber === car.number);
                 return (
-                  <div key={car.id} className="bg-white rounded-2xl border border-stone-200 p-5 flex flex-col gap-4 hover:shadow-md transition-shadow group">
+                  <div key={car.id} className="bg-surface rounded-2xl border border-hairline p-5 flex flex-col gap-4 hover:shadow-md transition-shadow group">
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="font-mono font-black text-lg tracking-tight">{car.number}</p>
@@ -952,7 +952,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 text-sm border-t border-stone-100 pt-3">
+                    <div className="flex items-center gap-2 text-sm border-t border-hairline pt-3">
                       <div className="w-6 h-6 rounded-full bg-stone-100 flex items-center justify-center shrink-0">
                         <User size={12} className="text-stone-400"/>
                       </div>
@@ -967,7 +967,7 @@ export default function App() {
                     )}
 
                     {!driver && (
-                      <button onClick={() => { setSelectedCarForAssignment(car.number); setTripOpen(true); }} className="w-full bg-stone-900 text-white py-2 rounded-xl text-xs font-bold hover:bg-stone-700 transition-colors">
+                      <button onClick={() => { setSelectedCarForAssignment(car.number); setTripOpen(true); }} className="w-full bg-ink text-white py-2 rounded-xl text-xs font-bold hover:bg-ink/85 transition-colors">
                         Priskirti vairuotoją
                       </button>
                     )}
@@ -982,11 +982,11 @@ export default function App() {
         {activeTab === 'history' && (
           <div className="space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h2 className="text-xl font-bold">Istorija</h2>
+              <h2 className="text-2xl font-display font-medium tracking-tight">Istorija</h2>
               <div className="flex items-center gap-3">
                 <div className="flex bg-stone-100 p-1 rounded-xl">
                   {(['upcoming', 'past'] as const).map(m => (
-                    <button key={m} onClick={() => setHistoryMode(m)} className={cn("px-4 py-1.5 rounded-lg text-xs font-bold transition-all", historyMode === m ? "bg-white shadow text-stone-900" : "text-stone-400")}>
+                    <button key={m} onClick={() => setHistoryMode(m)} className={cn("px-4 py-1.5 rounded-lg text-xs font-bold transition-all", historyMode === m ? "bg-surface shadow text-stone-900" : "text-stone-400")}>
                       {m === 'upcoming' ? 'Būsimi' : 'Atlikti'}
                     </button>
                   ))}
@@ -996,10 +996,10 @@ export default function App() {
             </div>
 
             {/* Plans table */}
-            <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden overflow-x-auto">
+            <div className="bg-surface rounded-2xl border border-hairline overflow-hidden overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-stone-900 text-white text-left">
+                  <tr className="bg-ink text-white text-left">
                     <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Data</th>
                     <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Auto</th>
                     <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Išeina</th>
@@ -1016,7 +1016,7 @@ export default function App() {
                   }).sort((a,b) => a.date.localeCompare(b.date)).map(plan => {
                     const car = cars.find(c => c.number === plan.carNumber);
                     return (
-                      <tr key={plan.id} className="hover:bg-stone-50 transition-colors">
+                      <tr key={plan.id} className="hover:bg-canvas transition-colors">
                         <td className="px-4 py-3 font-mono text-xs font-bold">{plan.date}</td>
                         <td className="px-4 py-3"><span className="font-mono font-bold bg-stone-100 px-2 py-0.5 rounded text-xs">{plan.carNumber}</span></td>
                         <td className="px-4 py-3 text-sm">{plan.leavingDriverName}</td>
@@ -1042,14 +1042,14 @@ export default function App() {
             </div>
 
             {/* Action Log */}
-            <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-              <div className="px-4 py-3 bg-stone-900 text-white flex items-center gap-2">
+            <div className="bg-surface rounded-2xl border border-hairline overflow-hidden">
+              <div className="px-4 py-3 bg-ink text-white flex items-center gap-2">
                 <History size={14}/>
                 <span className="text-xs font-bold uppercase tracking-wider">Veiksmų žurnalas</span>
               </div>
               <div className="divide-y divide-stone-100 max-h-96 overflow-y-auto">
                 {history.slice(0, 50).map(entry => (
-                  <div key={entry.id} className="px-4 py-3 flex gap-4 hover:bg-stone-50 transition-colors">
+                  <div key={entry.id} className="px-4 py-3 flex gap-4 hover:bg-canvas transition-colors">
                     <span className="text-[10px] font-mono text-stone-400 shrink-0 pt-0.5 w-32">{entry.timestamp}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -1071,11 +1071,11 @@ export default function App() {
         {activeTab === 'calendar' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold">Keitimų kalendorius</h2>
+              <h2 className="text-2xl font-display font-medium tracking-tight">Keitimų kalendorius</h2>
               <MonthNav value={selectedMonth} onChange={setSelectedMonth} />
             </div>
-            <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-              <div className="grid grid-cols-7 border-b border-stone-200 bg-stone-900 text-white">
+            <div className="bg-surface rounded-2xl border border-hairline overflow-hidden">
+              <div className="grid grid-cols-7 border-b border-hairline bg-ink text-white">
                 {['Pr', 'An', 'Tr', 'Kt', 'Pn', 'Še', 'Se'].map(d => (
                   <div key={d} className="p-3 text-center text-[10px] font-black uppercase tracking-widest">{d}</div>
                 ))}
@@ -1091,8 +1091,8 @@ export default function App() {
                     const curr = isSameMonth(day, selectedMonth);
                     const tod  = isSameDay(day, new Date());
                     return (
-                      <div key={i} onClick={() => dp.length > 0 && setSelectedCalendarDay(ds)} className={cn("min-h-[100px] p-2 border-r border-b border-stone-100 transition-colors", !curr && "bg-stone-50 opacity-40", tod && "bg-blue-50", dp.length > 0 && "cursor-pointer hover:bg-stone-50")}>
-                        <span className={cn("text-[10px] font-bold w-6 h-6 flex items-center justify-center rounded-full", tod ? "bg-stone-900 text-white" : "text-stone-400")}>{format(day, 'd')}</span>
+                      <div key={i} onClick={() => dp.length > 0 && setSelectedCalendarDay(ds)} className={cn("min-h-[100px] p-2 border-r border-b border-hairline transition-colors", !curr && "bg-canvas opacity-40", tod && "bg-blue-50", dp.length > 0 && "cursor-pointer hover:bg-canvas")}>
+                        <span className={cn("text-[10px] font-bold w-6 h-6 flex items-center justify-center rounded-full", tod ? "bg-ink text-white" : "text-stone-400")}>{format(day, 'd')}</span>
                         <div className="mt-1 space-y-1">
                           {dp.slice(0, 3).map(p => (
                             <div key={p.id} className={cn("text-[8px] px-1.5 py-0.5 rounded font-bold truncate", p.status === 'Suplanuota' ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700")}>
@@ -1114,7 +1114,7 @@ export default function App() {
         {activeTab === 'auto-grafikas' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold">Automobilių grafikas</h2>
+              <h2 className="text-2xl font-display font-medium tracking-tight">Automobilių grafikas</h2>
               <MonthNav value={selectedMonth} onChange={setSelectedMonth} />
             </div>
             <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} showCars />
@@ -1146,7 +1146,7 @@ export default function App() {
               <Field label="Įmonė"><select name="companyType" required className={selectCls}><option value="LT">LT</option><option value="PL">PL</option></select></Field>
               <Field label="Tipas"><select name="specialization" required className={selectCls}><option value="Tentas">Tentas</option><option value="Refas">Refas</option><option value="Universalus">Universalus</option></select></Field>
             </div>
-            <button type="submit" className="w-full bg-stone-900 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-stone-800 transition-colors">Pridėti</button>
+            <button type="submit" className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors">Pridėti</button>
           </form>
         </Modal>
       )}
@@ -1161,7 +1161,7 @@ export default function App() {
               <Field label="Tipas"><select name="type" required className={selectCls}><option value="Tentas">Tentas</option><option value="Refas">Refas</option></select></Field>
             </div>
             <Field label="Aktyvus nuo"><input name="activeFrom" type="date" required defaultValue={format(new Date(), 'yyyy-MM-dd')} className={inputCls} /></Field>
-            <button type="submit" className="w-full bg-stone-900 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-stone-800 transition-colors">Pridėti</button>
+            <button type="submit" className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors">Pridėti</button>
           </form>
         </Modal>
       )}
@@ -1176,7 +1176,7 @@ export default function App() {
               <Field label="Tipas"><select name="type" required defaultValue={selectedCarForEdit.type} className={selectCls}><option value="Tentas">Tentas</option><option value="Refas">Refas</option></select></Field>
             </div>
             <Field label="Būsena"><select name="status" defaultValue={selectedCarForEdit.status} className={selectCls}><option value="Aktyvus">Aktyvus</option><option value="Remontas">Remontas</option></select></Field>
-            <button type="submit" className="w-full bg-stone-900 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-stone-800 transition-colors">Išsaugoti</button>
+            <button type="submit" className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors">Išsaugoti</button>
           </form>
         </Modal>
       )}
@@ -1191,7 +1191,7 @@ export default function App() {
               <Field label="Pradžia"><input name="startDate" type="date" required defaultValue={format(new Date(), 'yyyy-MM-dd')} className={inputCls} /></Field>
               <Field label="Planuojama pabaiga"><input name="returnDate" type="date" required defaultValue={format(addDays(new Date(), 42), 'yyyy-MM-dd')} className={inputCls} /></Field>
             </div>
-            <button type="submit" className="w-full bg-stone-900 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-stone-800 transition-colors">Patvirtinti</button>
+            <button type="submit" className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors">Patvirtinti</button>
           </form>
         </Modal>
       )}
@@ -1231,7 +1231,7 @@ export default function App() {
               <Field label="Namų būsena"><select name="homeStatus" defaultValue={selectedDriverForEdit.homeStatus} className={selectCls}><option value="Nėra">Nėra</option><option value="Poilsis">Poilsis</option><option value="Tvarko dokumentus">Tvarko dokumentus</option></select></Field>
               <Field label="Gali nuo"><input name="readinessDate" type="date" defaultValue={selectedDriverForEdit.readinessDate || ''} className={inputCls} /></Field>
             </div>
-            <button type="submit" className="w-full bg-stone-900 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-stone-800 transition-colors">Išsaugoti</button>
+            <button type="submit" className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors">Išsaugoti</button>
           </form>
         </Modal>
       )}
@@ -1239,19 +1239,19 @@ export default function App() {
       {/* Calendar Day Detail */}
       {selectedCalendarDay && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-stone-900 text-white flex items-center justify-between">
+          <div className="bg-surface w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 bg-ink text-white flex items-center justify-between">
               <div>
                 <p className="font-bold">{format(parseISO(selectedCalendarDay), 'yyyy MMMM d', { locale: lt })}</p>
                 <p className="text-[10px] text-stone-400 uppercase tracking-wider">Dienos planai</p>
               </div>
-              <button onClick={() => setSelectedCalendarDay(null)} className="p-1.5 hover:bg-white/10 rounded-lg"><X size={16}/></button>
+              <button onClick={() => setSelectedCalendarDay(null)} className="p-1.5 hover:bg-surface/10 rounded-lg"><X size={16}/></button>
             </div>
             <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
               {plans.filter(p => p.date === selectedCalendarDay).map(plan => (
-                <div key={plan.id} className="border border-stone-100 rounded-xl p-4">
+                <div key={plan.id} className="border border-hairline rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="font-mono font-black bg-stone-900 text-white px-2 py-0.5 rounded text-sm">{plan.carNumber}</span>
+                    <span className="font-mono font-black bg-ink text-white px-2 py-0.5 rounded text-sm">{plan.carNumber}</span>
                     <Badge variant={plan.status === 'Suplanuota' ? 'blue' : 'green'}>{plan.status}</Badge>
                   </div>
                   <div className="flex items-center justify-between gap-4">
@@ -1263,8 +1263,8 @@ export default function App() {
               ))}
               {plans.filter(p => p.date === selectedCalendarDay).length === 0 && <p className="text-center text-stone-400 text-sm py-8">Planų nėra</p>}
             </div>
-            <div className="px-6 py-4 border-t border-stone-100">
-              <button onClick={() => setSelectedCalendarDay(null)} className="w-full bg-stone-900 text-white py-2.5 rounded-xl font-bold text-sm">Uždaryti</button>
+            <div className="px-6 py-4 border-t border-hairline">
+              <button onClick={() => setSelectedCalendarDay(null)} className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm">Uždaryti</button>
             </div>
           </div>
         </div>
@@ -1273,13 +1273,13 @@ export default function App() {
       {/* Confirm Plan */}
       {confirmData && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between">
+          <div className="bg-surface w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-hairline flex items-center justify-between">
               <h3 className="font-bold">{confirmData.isExecution ? 'Patvirtinti įvykdymą' : 'Patvirtinti planą'}</h3>
               <button onClick={() => setConfirmData(null)} className="p-1.5 hover:bg-stone-100 rounded-lg"><X size={16}/></button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="bg-stone-50 rounded-xl p-4 space-y-3">
+              <div className="bg-canvas rounded-xl p-4 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-stone-400 font-medium">Automobilis</span>
                   <span className="font-mono font-black">{confirmData.carNumber}</span>
@@ -1292,7 +1292,7 @@ export default function App() {
                     <span className="font-bold">{confirmData.date}</span>
                   )}
                 </div>
-                <div className="pt-2 border-t border-stone-200 flex items-center gap-3">
+                <div className="pt-2 border-t border-hairline flex items-center gap-3">
                   <div className="flex-1">
                     <p className="text-[9px] text-stone-400 font-bold uppercase">Namo</p>
                     <p className="text-sm font-semibold truncate">{confirmData.leavingId && confirmData.leavingId !== 'NONE' ? drivers.find(d => d.id === confirmData.leavingId)?.name || '—' : 'Nauja mašina'}</p>
@@ -1308,13 +1308,13 @@ export default function App() {
                 <input type="date" className={inputCls} value={newReturnDate} onChange={e => setNewReturnDate(e.target.value)} />
               </Field>
             </div>
-            <div className="px-6 py-4 border-t border-stone-100 flex gap-3">
-              <button onClick={() => setConfirmData(null)} className="flex-1 py-2.5 border border-stone-200 rounded-xl text-sm font-semibold hover:bg-stone-50 transition-colors">Atšaukti</button>
+            <div className="px-6 py-4 border-t border-hairline flex gap-3">
+              <button onClick={() => setConfirmData(null)} className="flex-1 py-2.5 border border-hairline rounded-xl text-sm font-semibold hover:bg-canvas transition-colors">Atšaukti</button>
               <button onClick={() => {
                 if (confirmData.isExecution && confirmData.planId) completePlan(confirmData.planId, newReturnDate, confirmData.executionDate);
                 else createPlan(confirmData.carNumber, confirmData.leavingId, confirmData.incomingId, confirmData.date, newReturnDate);
                 setConfirmData(null);
-              }} className="flex-1 py-2.5 bg-stone-900 text-white rounded-xl text-sm font-bold hover:bg-stone-800 transition-colors">
+              }} className="flex-1 py-2.5 bg-ink text-white rounded-xl text-sm font-bold hover:bg-ink/90 transition-colors">
                 {confirmData.isExecution ? 'Įvykdyta ✓' : 'Patvirtinti'}
               </button>
             </div>
@@ -1341,7 +1341,7 @@ function SectionHeader({ icon, title, children }: { icon: React.ReactNode; title
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
       <div className="flex items-center gap-2.5">
         {icon}
-        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+        <h2 className="text-xl font-display font-medium tracking-tight">{title}</h2>
       </div>
       {children}
     </div>
@@ -1408,11 +1408,11 @@ function PlanCard({ plan, drivers, cars, plans, onComplete, onDelete, onEdit, ed
   setPlans: React.Dispatch<React.SetStateAction<ReplacementPlan[]>>;
 }) {
   return (
-    <div className="bg-white border border-stone-200 rounded-2xl p-5 hover:shadow-md transition-all">
+    <div className="bg-surface border border-hairline rounded-2xl p-5 hover:shadow-md transition-all">
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
         {/* Date */}
         <div className="flex flex-col items-center min-w-[60px]">
-          <div className="w-12 h-12 rounded-2xl bg-stone-900 text-white flex flex-col items-center justify-center">
+          <div className="w-12 h-12 rounded-2xl bg-ink text-white flex flex-col items-center justify-center">
             <span className="text-lg font-black leading-none">{format(parseISO(plan.date), 'dd')}</span>
             <span className="text-[8px] uppercase opacity-60">{format(parseISO(plan.date), 'EEE', { locale: lt })}</span>
           </div>
@@ -1425,7 +1425,7 @@ function PlanCard({ plan, drivers, cars, plans, onComplete, onDelete, onEdit, ed
             <p className="text-[9px] text-red-500 font-black uppercase mb-0.5 flex items-center justify-end gap-1"><LogOut size={9}/>Namo</p>
             <p className="font-bold text-sm">{plan.leavingDriverName}</p>
           </div>
-          <div className="w-8 h-8 rounded-xl bg-stone-50 border border-stone-200 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-canvas border border-hairline flex items-center justify-center shrink-0">
             <ArrowRightLeft size={14} className="text-stone-400"/>
           </div>
           <div className="flex-1">
@@ -1435,7 +1435,7 @@ function PlanCard({ plan, drivers, cars, plans, onComplete, onDelete, onEdit, ed
         </div>
 
         {/* Actions */}
-        <div className="flex sm:flex-col gap-2 border-t sm:border-t-0 sm:border-l border-stone-100 pt-3 sm:pt-0 sm:pl-4 w-full sm:w-auto">
+        <div className="flex sm:flex-col gap-2 border-t sm:border-t-0 sm:border-l border-hairline pt-3 sm:pt-0 sm:pl-4 w-full sm:w-auto">
           <button onClick={onComplete} className="flex-1 sm:flex-none p-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl transition-all" title="Įvykdyta"><CheckCircle2 size={16}/></button>
           <button onClick={onEdit}    className="flex-1 sm:flex-none p-2.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all" title="Redaguoti"><Edit size={16}/></button>
           <button onClick={onDelete}  className="flex-1 sm:flex-none p-2.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all" title="Ištrinti"><X size={16}/></button>
@@ -1456,10 +1456,10 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars 
   const rows = showCars ? cars : drivers;
 
   return (
-    <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden overflow-x-auto">
+    <div className="bg-surface rounded-2xl border border-hairline overflow-hidden overflow-x-auto">
       <div className="min-w-[900px]">
         {/* Header */}
-        <div className="flex border-b border-stone-200 bg-stone-900 text-white">
+        <div className="flex border-b border-hairline bg-ink text-white">
           <div className="w-48 shrink-0 px-4 py-3 text-[10px] font-black uppercase tracking-wider">{showCars ? 'Auto' : 'Vairuotojas'}</div>
           <div className="flex flex-1">
             {days.map(d => (
@@ -1525,8 +1525,8 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars 
             const c = car;
 
             return (
-              <div key={(d || c)!.id} className="flex group hover:bg-stone-50 transition-colors h-12">
-                <div className="w-48 shrink-0 px-4 flex items-center gap-2 border-r border-stone-100">
+              <div key={(d || c)!.id} className="flex group hover:bg-canvas transition-colors h-12">
+                <div className="w-48 shrink-0 px-4 flex items-center gap-2 border-r border-hairline">
                   <div className={cn("w-2 h-2 rounded-full shrink-0", d ? (d.status === 'Reise' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-violet-500')} />
                   <div className="min-w-0">
                     <p className="text-xs font-bold truncate">{d ? d.name : c!.number}</p>
@@ -1535,7 +1535,7 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars 
                 </div>
                 <div className="flex-1 relative">
                   {days.map((day, i) => (
-                    <div key={i} className={cn("absolute top-0 bottom-0 border-r border-stone-100", isSameDay(day, new Date()) && "bg-blue-50/50")} style={{ left: `${(i / totalDays) * 100}%`, width: `${(1 / totalDays) * 100}%` }} />
+                    <div key={i} className={cn("absolute top-0 bottom-0 border-r border-hairline", isSameDay(day, new Date()) && "bg-blue-50/50")} style={{ left: `${(i / totalDays) * 100}%`, width: `${(1 / totalDays) * 100}%` }} />
                   ))}
                   {bars.map((bar, idx) => (
                     <div key={idx} className={cn("absolute top-2 bottom-2 rounded-lg flex items-center px-2 overflow-hidden text-white text-[9px] font-bold", bar.type === 'active' ? 'bg-blue-500' : 'bg-emerald-400 border border-dashed border-emerald-600')}

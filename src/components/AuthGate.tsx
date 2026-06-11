@@ -52,12 +52,13 @@ function SupabaseAuthGate({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-canvas flex items-center justify-center p-4 font-sans text-ink">
       <form onSubmit={signIn} className="bg-surface w-full max-w-sm rounded-3xl shadow-card border border-hairline p-8 space-y-6">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 bg-ink rounded-2xl flex items-center justify-center">
-            <Truck className="text-white w-6 h-6" />
+          <div className="w-12 h-12 bg-ink rounded-2xl flex items-center justify-center ring-1 ring-gold/30">
+            <Truck className="text-gold-soft w-6 h-6" />
           </div>
           <div className="text-center">
-            <p className="text-lg font-semibold tracking-tight">Dispečeris</p>
-            <p className="text-xs text-muted mt-0.5">Prisijunkite, kad tęstumėte</p>
+            <p className="text-2xl font-display font-medium tracking-tight">Dispečeris</p>
+            <div className="mx-auto mt-1.5 mb-0.5 h-px w-8 bg-gold/50" />
+            <p className="text-xs text-muted">Prisijunkite, kad tęstumėte</p>
           </div>
         </div>
 

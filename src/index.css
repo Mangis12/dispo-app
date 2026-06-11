@@ -15,12 +15,12 @@
 
   body {
     @apply text-ink;
-    background-color: #F4F3EF;
+    background-color: #F2ECE1;
     letter-spacing: -0.01em;
   }
 
   h1, h2, h3 {
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
   }
 
   ::-webkit-scrollbar {
