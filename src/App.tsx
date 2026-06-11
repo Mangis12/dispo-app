@@ -3,11 +3,11 @@ import {
   Users, Truck, Home, Calendar, Plus, ArrowRightLeft, ArrowRight,
   AlertCircle, UserPlus, LogOut, LogIn, X, Edit, History,
   CheckCircle2, User, Trash2, ChevronLeft, ChevronRight,
-  LayoutDashboard, Database, Wifi, WifiOff, Bell, Map as MapIcon, Menu
+  LayoutDashboard, Database, Wifi, WifiOff, Bell, Map as MapIcon, Menu, Search, Mail, Undo2
 } from 'lucide-react';
 import {
   format, differenceInDays, parseISO, isBefore, isAfter,
-  addDays, subDays, isValid, startOfWeek, endOfWeek, getWeek,
+  addDays, subDays, addWeeks, isValid, startOfWeek, endOfWeek, getWeek,
   isSameWeek, startOfMonth, endOfMonth, eachDayOfInterval,
   isSameDay, addMonths, subMonths, isSameMonth, getDaysInMonth
 } from 'date-fns';
@@ -197,6 +197,11 @@ export default function App() {
   const [selectedDriverForHome, setSelectedDriverForHome]   = useState<Driver | null>(null);
   const [selectedDriverForEdit, setSelectedDriverForEdit]   = useState<Driver | null>(null);
   const [selectedCarForEdit, setSelectedCarForEdit]         = useState<Car | null>(null);
+  const [editAssignment, setEditAssignment]                 = useState<CarAssignment | null>(null);
+  const [planGroup, setPlanGroup]                           = useState<'all' | CarType>('all');
+  const [emailGroup, setEmailGroup]                         = useState<CarType | null>(null);
+  const [emailTo, setEmailTo]                               = useState('');
+  const [emailWeeks, setEmailWeeks]                         = useState<1 | 2>(2);
 
   // Planning
   const [selectedTripDriverId, setSelectedTripDriverId] = useState('');
@@ -449,6 +454,60 @@ export default function App() {
     if (plan.leavingDriverId !== 'NONE') logHistory(plan.leavingDriverId, plan.leavingDriverName, 'Išsiųstas namo', `Poilsis, pasiruošęs: ${readiness}`, 'Nėra', execDate);
     logHistory(plan.incomingDriverId, plan.incomingDriverName, 'Pakeitimas įvykdytas', `Auto: ${plan.carNumber}, nuo ${execDate} iki ${returnDate}`, plan.carNumber, execDate);
     showToast(`Pakeitimas įvykdytas: ${plan.incomingDriverName} → ${plan.carNumber}`);
+  };
+
+  // ── Atšaukti įvykdytą pakeitimą (klaidos taisymas) — completePlan inversija ──
+  const undoCompletion = (planId: string) => {
+    const plan = plans.find(p => p.id === planId);
+    if (!plan) return;
+    const execDate = plan.date;
+    // Planas vėl tampa suplanuotu
+    setPlans(prev => prev.map(p => p.id === planId ? { ...p, status: 'Suplanuota' } : p));
+    // Atstatom vairuotojus: įvykdęs (incoming) grįžta namo; ankstesnis (leaving) — atgal į reisą
+    setDrivers(prev => prev.map(d => {
+      if (d.id === plan.incomingDriverId)
+        return { ...d, status: 'Namuose', currentCar: 'Nėra', startDate: null, plannedReturnDate: null, homeStatus: 'Poilsis', readinessDate: execDate };
+      if (plan.leavingDriverId && plan.leavingDriverId !== 'NONE' && d.id === plan.leavingDriverId)
+        return { ...d, status: 'Reise', currentCar: plan.carNumber, plannedReturnDate: execDate, homeStatus: 'Nėra', readinessDate: null, lastTripEndDate: null };
+      return d;
+    }));
+    // Atstatom priskyrimus: pašalinam incoming atvirą segmentą; leaving segmentą vėl atidarom
+    setCarAssignments(prev => {
+      const withoutIncoming = prev.filter(a => !(a.carNumber === plan.carNumber && a.driverId === plan.incomingDriverId && a.startDate === execDate && a.endDate === null));
+      return withoutIncoming.map(a => (a.carNumber === plan.carNumber && a.driverId === plan.leavingDriverId && a.endDate === execDate) ? { ...a, endDate: null } : a);
+    });
+    logHistory(plan.incomingDriverId, plan.incomingDriverName, 'Pakeitimas atšauktas', `Auto: ${plan.carNumber} — įvykdymas anuliuotas`, plan.carNumber, execDate);
+    showToast(`Įvykdymas atšauktas: ${plan.carNumber}`);
+  };
+
+  // ── Priskyrimo (grafiko segmento) redagavimas / trynimas ──
+  const updateAssignment = (id: string, updates: Partial<CarAssignment>) => {
+    setCarAssignments(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+    showToast('Priskyrimas atnaujintas');
+  };
+  const deleteAssignment = (id: string) => {
+    const a = carAssignments.find(x => x.id === id);
+    setCarAssignments(prev => prev.filter(x => x.id !== id));
+    if (a) logHistory(a.driverId, a.driverName, 'Priskyrimas ištrintas', `Auto: ${a.carNumber} (${a.startDate}–${a.endDate || 'dabar'})`, a.carNumber, a.startDate);
+    showToast('Priskyrimas ištrintas');
+  };
+
+  // ── El. laiško su savaitės planais turinys (mailto) ──
+  const buildPlansEmail = (group: CarType, weeks: 1 | 2) => {
+    const from = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const to   = endOfWeek(addWeeks(new Date(), weeks - 1), { weekStartsOn: 1 });
+    const list = plans
+      .filter(p => p.status === 'Suplanuota')
+      .filter(p => cars.find(c => c.number === p.carNumber)?.type === group)
+      .filter(p => { const dt = parseISO(p.date); return !isBefore(dt, from) && !isAfter(dt, to); })
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const lines = list.length
+      ? list.map(p => `• ${p.date} · ${p.carNumber} (${group}): ${p.leavingDriverName || '—'} → ${p.incomingDriverName}`).join('\n')
+      : 'Šiam laikotarpiui planų nėra.';
+    const period = `${format(from, 'MM-dd')}–${format(to, 'MM-dd')}`;
+    const subject = `${group} keitimų planai (${period})`;
+    const body = `Sveiki,\n\n${group} grupės mašinų keitimų planai (${weeks === 1 ? 'ši savaitė' : 'ši ir kita savaitė'}, ${period}):\n\n${lines}\n\n— Dispečeris · Vestex Transport`;
+    return { subject, body, count: list.length };
   };
 
   // ── Computed ──────────────────────────────────────────────────────────────────
@@ -721,7 +780,7 @@ export default function App() {
               <SectionHeader icon={<LayoutDashboard size={18} className="text-violet-500"/>} title="Vairuotojų grafikas">
                 <MonthNav value={selectedMonth} onChange={setSelectedMonth} />
               </SectionHeader>
-              <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} />
+              <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} onEditAssignment={setEditAssignment} />
             </section>
           </div>
         )}
@@ -864,29 +923,76 @@ export default function App() {
               </div>
             </div>
 
-            {/* Active Plans List */}
-            {activePlans.length > 0 && (
-              <div className="bg-surface rounded-2xl border border-hairline p-6">
-                <p className="text-sm font-bold mb-4">Visi aktyvūs planai ({activePlans.length})</p>
-                <div className="space-y-2">
-                  {activePlans.sort((a,b) => a.date.localeCompare(b.date)).map(plan => (
-                    <div key={plan.id} className="flex items-center justify-between p-3 bg-canvas rounded-xl border border-hairline">
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-xs font-bold bg-ink text-white px-2 py-0.5 rounded">{plan.carNumber}</span>
-                        <div>
-                          <p className="text-xs font-semibold">{plan.leavingDriverName} → {plan.incomingDriverName}</p>
-                          <p className="text-[10px] text-stone-400">{plan.date}{plan.newPlannedReturnDate ? ` • dirbs iki: ${plan.newPlannedReturnDate}` : ''}</p>
-                        </div>
+            {/* Planai pagal grupes (Tentai / Refai) + el. paštas + įvykdyti su atšaukimu */}
+            {(activePlans.length > 0 || plans.some(p => p.status === 'Atlikta')) && (() => {
+              const typeOf = (p: ReplacementPlan) => cars.find(c => c.number === p.carNumber)?.type;
+              const shown = activePlans.filter(p => planGroup === 'all' || typeOf(p) === planGroup).sort((a, b) => a.date.localeCompare(b.date));
+              const done  = plans.filter(p => p.status === 'Atlikta').sort((a, b) => b.date.localeCompare(a.date));
+              return (
+                <div className="bg-surface rounded-2xl border border-hairline p-6 space-y-4">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    <p className="text-sm font-semibold">Aktyvūs planai ({shown.length})</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex bg-canvas p-1 rounded-xl gap-1">
+                        {([['all', 'Visi'], ['Tentas', 'Tentai'], ['Refas', 'Refai']] as const).map(([g, lbl]) => (
+                          <button key={g} onClick={() => setPlanGroup(g)}
+                            className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all", planGroup === g ? "bg-ink text-white" : "text-muted hover:text-ink")}>{lbl}</button>
+                        ))}
                       </div>
-                      <div className="flex gap-1.5">
-                        <button onClick={() => { setConfirmData({ carNumber: plan.carNumber, leavingId: plan.leavingDriverId, incomingId: plan.incomingDriverId, date: plan.date, driverName: plan.incomingDriverName, planId: plan.id, isExecution: true }); if (plan.newPlannedReturnDate) setNewReturnDate(plan.newPlannedReturnDate); }} className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-all"><CheckCircle2 size={14}/></button>
-                        <button onClick={() => deletePlan(plan.id)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Trash2 size={14}/></button>
+                      <button onClick={() => setEmailGroup('Tentas')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-hairline text-ink hover:border-ink/25 transition-all"><Mail size={13}/> Tentai</button>
+                      <button onClick={() => setEmailGroup('Refas')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-hairline text-ink hover:border-ink/25 transition-all"><Mail size={13}/> Refai</button>
+                    </div>
+                  </div>
+
+                  {shown.length === 0 ? (
+                    <p className="text-xs text-muted italic py-4 text-center">Nėra aktyvių planų šioje grupėje</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {shown.map(plan => {
+                        const t = typeOf(plan);
+                        return (
+                          <div key={plan.id} className="flex items-center justify-between p-3 bg-canvas rounded-xl border border-hairline">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="font-mono text-xs font-semibold bg-ink text-white px-2 py-0.5 rounded shrink-0">{plan.carNumber}</span>
+                              {t && <Badge variant={t === 'Tentas' ? 'blue' : 'purple'}>{t}</Badge>}
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold truncate">{plan.leavingDriverName} → {plan.incomingDriverName}</p>
+                                <p className="text-[10px] text-muted">{plan.date}{plan.newPlannedReturnDate ? ` • dirbs iki: ${plan.newPlannedReturnDate}` : ''}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-1.5 shrink-0">
+                              <button title="Įvykdyti" onClick={() => { setConfirmData({ carNumber: plan.carNumber, leavingId: plan.leavingDriverId, incomingId: plan.incomingDriverId, date: plan.date, driverName: plan.incomingDriverName, planId: plan.id, isExecution: true }); if (plan.newPlannedReturnDate) setNewReturnDate(plan.newPlannedReturnDate); }} className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-all"><CheckCircle2 size={14}/></button>
+                              <button title="Ištrinti" onClick={() => deletePlan(plan.id)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Trash2 size={14}/></button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {done.length > 0 && (
+                    <div className="pt-3 border-t border-hairline">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted mb-2">Įvykdyti pakeitimai · galima atšaukti</p>
+                      <div className="space-y-2">
+                        {done.slice(0, 8).map(plan => (
+                          <div key={plan.id} className="flex items-center justify-between p-3 bg-canvas/50 rounded-xl border border-hairline">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="font-mono text-xs font-semibold bg-emerald-600 text-white px-2 py-0.5 rounded shrink-0">{plan.carNumber}</span>
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold truncate">{plan.leavingDriverName} → {plan.incomingDriverName}</p>
+                                <p className="text-[10px] text-muted">Įvykdyta: {plan.date}</p>
+                              </div>
+                            </div>
+                            <button title="Atšaukti įvykdymą" onClick={() => { if (confirm('Atšaukti šį įvykdymą? Duomenys grįš į būseną prieš pakeitimą.')) undoCompletion(plan.id); }}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-50 transition-colors shrink-0"><Undo2 size={13}/> Atšaukti</button>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         )}
 
@@ -1183,7 +1289,7 @@ export default function App() {
             <div className="flex items-center justify-end">
               <MonthNav value={selectedMonth} onChange={setSelectedMonth} />
             </div>
-            <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} showCars />
+            <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} showCars onEditAssignment={setEditAssignment} />
           </div>
         )}
 
@@ -1388,6 +1494,75 @@ export default function App() {
         </div>
       )}
 
+      {/* Priskyrimo (grafiko segmento) redagavimas */}
+      {editAssignment && (
+        <Modal title="Redaguoti priskyrimą" onClose={() => setEditAssignment(null)}>
+          <form className="space-y-4" onSubmit={e => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            const drvId = f.get('driver') as string;
+            const drv = drivers.find(d => d.id === drvId);
+            updateAssignment(editAssignment.id, {
+              driverId: drvId,
+              driverName: drv?.name || editAssignment.driverName,
+              startDate: f.get('startDate') as string,
+              endDate: (f.get('endDate') as string) || null,
+            });
+            setEditAssignment(null);
+          }}>
+            <div className="text-xs text-muted bg-canvas rounded-xl px-3 py-2">Mašina: <span className="font-mono font-semibold text-ink">{editAssignment.carNumber}</span></div>
+            <Field label="Vairuotojas">
+              <select name="driver" defaultValue={editAssignment.driverId} className={selectCls}>
+                {drivers.map(d => <option key={d.id} value={d.id}>{d.name} ({d.companyType} • {d.specialization})</option>)}
+              </select>
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Nuo"><input type="date" name="startDate" defaultValue={editAssignment.startDate} className={inputCls} required /></Field>
+              <Field label="Iki (tuščia = dabar)"><input type="date" name="endDate" defaultValue={editAssignment.endDate || ''} className={inputCls} /></Field>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={() => { if (confirm('Ištrinti šį priskyrimą?')) { deleteAssignment(editAssignment.id); setEditAssignment(null); } }}
+                className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-red-500 border border-red-200 hover:bg-red-50 transition-colors">
+                <Trash2 size={15}/> Ištrinti
+              </button>
+              <button type="submit" className="flex-1 py-2.5 bg-ink text-white rounded-xl text-sm font-medium hover:bg-ink/90 transition-colors">Išsaugoti</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* El. laiškas su grupės planais */}
+      {emailGroup && (() => {
+        const mail = buildPlansEmail(emailGroup, emailWeeks);
+        return (
+          <Modal title={`Siųsti ${emailGroup} planus`} onClose={() => setEmailGroup(null)}>
+            <div className="space-y-4">
+              <Field label="Gavėjo el. paštas">
+                <input type="email" value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="komanda@imone.lt" className={inputCls} />
+              </Field>
+              <Field label="Laikotarpis">
+                <div className="flex bg-canvas p-1 rounded-xl gap-1">
+                  {([[1, 'Ši savaitė'], [2, 'Ši + kita']] as const).map(([w, lbl]) => (
+                    <button key={w} type="button" onClick={() => setEmailWeeks(w)}
+                      className={cn("flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all", emailWeeks === w ? "bg-ink text-white" : "text-muted hover:text-ink")}>{lbl}</button>
+                  ))}
+                </div>
+              </Field>
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted">Peržiūra ({mail.count} planai)</p>
+                <pre className="text-[11px] leading-relaxed text-ink bg-canvas border border-hairline rounded-xl p-3 max-h-48 overflow-auto whitespace-pre-wrap font-sans">{mail.body}</pre>
+              </div>
+              <a
+                href={`mailto:${encodeURIComponent(emailTo)}?subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body)}`}
+                onClick={() => { showToast('Atidaromas el. laiškas…'); setTimeout(() => setEmailGroup(null), 300); }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-ink text-white rounded-xl text-sm font-medium hover:bg-ink/90 transition-colors">
+                <Mail size={15}/> Atidaryti laišką
+              </a>
+            </div>
+          </Modal>
+        );
+      })()}
+
       {/* Toast */}
       {toast && (
         <div className={cn("fixed bottom-6 right-6 flex items-center gap-3 pl-4 pr-3 py-3 rounded-2xl shadow-float z-[100] animate-in slide-in-from-bottom-4", toast.type === 'success' ? "bg-ink text-white" : "bg-red-500 text-white")}>
@@ -1524,10 +1699,12 @@ type TLSegment = {
   startIdx: number; endIdx: number; inclusiveEnd: boolean;
   type: 'active' | 'planned'; name: string; color: string;
   from: string; to: string | null;
+  assignment?: CarAssignment;
 };
 
-function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars }: {
+function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars, onEditAssignment }: {
   drivers: Driver[]; cars: Car[]; plans: ReplacementPlan[]; carAssignments: CarAssignment[]; month: Date; showCars?: boolean;
+  onEditAssignment?: (a: CarAssignment) => void;
 }) {
   const monthStart = startOfMonth(month);
   const monthEnd   = endOfMonth(month);
@@ -1535,111 +1712,153 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars 
   const days       = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const pct        = (n: number) => `${(n / totalDays) * 100}%`;
 
+  // ── Paieška (Excel stiliaus: datalist + filtravimas pagal pavardę/numerį) ──
+  const [q, setQ] = useState('');
+  const ql = q.trim().toLowerCase();
+  const allRows = showCars ? cars : drivers;
+  const rows = !ql ? allRows : allRows.filter(item => {
+    if (!showCars) return (item as Driver).name.toLowerCase().includes(ql);
+    const c = item as Car;
+    return c.number.toLowerCase().includes(ql) || carAssignments.some(a => a.carNumber === c.number && a.driverName.toLowerCase().includes(ql));
+  });
+
   return (
-    <div className="bg-surface rounded-2xl border border-hairline overflow-hidden overflow-x-auto">
-      <div className="min-w-[920px]">
-        {/* Header */}
-        <div className="flex border-b border-hairline bg-ink text-white">
-          <div className="w-48 shrink-0 px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">{showCars ? 'Auto' : 'Vairuotojas'}</div>
-          <div className="flex flex-1">
-            {days.map(d => {
-              const today = isSameDay(d, new Date());
-              const weekend = [0, 6].includes(d.getDay());
+    <div className="bg-surface rounded-2xl border border-hairline overflow-hidden">
+      {/* Paieška */}
+      <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-hairline">
+        <Search size={15} className="text-muted shrink-0" />
+        <input
+          list="tl-search-list"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder={showCars ? 'Ieškoti mašinos arba vairuotojo…' : 'Ieškoti vairuotojo (pavardė)…'}
+          className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-muted"
+        />
+        <datalist id="tl-search-list">
+          {drivers.map(d => <option key={d.id} value={d.name} />)}
+          {cars.map(c => <option key={c.id} value={c.number} />)}
+        </datalist>
+        {q && <button onClick={() => setQ('')} className="text-muted hover:text-ink transition-colors"><X size={15} /></button>}
+        <span className="text-[11px] text-muted shrink-0 tabular-nums">{rows.length}/{allRows.length}</span>
+      </div>
+
+      <div className="overflow-x-auto">
+        <div className="min-w-[920px]">
+          {/* Header */}
+          <div className="flex border-b border-hairline bg-ink text-white">
+            <div className="w-48 shrink-0 px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">{showCars ? 'Auto' : 'Vairuotojas'}</div>
+            <div className="flex flex-1">
+              {days.map(d => {
+                const today = isSameDay(d, new Date());
+                const weekend = [0, 6].includes(d.getDay());
+                return (
+                  <div key={d.toString()} className={cn("flex-1 py-2 text-center border-r border-white/5", today && "bg-gold/30", weekend && !today && "bg-white/5")}>
+                    <div className="text-[7px] uppercase opacity-50">{format(d, 'EEE', { locale: lt })}</div>
+                    <div className="text-[9px] font-semibold">{format(d, 'd')}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Rows */}
+          <div className="divide-y divide-hairline">
+            {rows.length === 0 && <div className="px-4 py-8 text-center text-sm text-muted">Nieko nerasta pagal „{q}"</div>}
+            {rows.map(item => {
+              const driver = !showCars ? item as Driver : null;
+              const car    = showCars  ? item as Car    : null;
+
+              const segs: TLSegment[] = [];
+
+              const pushSeg = (startDate: string, endDate: string | null, type: 'active' | 'planned', name: string, seed: string, assignment?: CarAssignment) => {
+                const s = parseISO(startDate);
+                const eRaw = endDate ? parseISO(endDate) : monthEnd;
+                if (isAfter(s, monthEnd) || isBefore(eRaw, monthStart)) return;
+                const startIdx = isBefore(s, monthStart) ? 0 : differenceInDays(s, monthStart);
+                const closedInMonth = !!endDate && !isAfter(eRaw, monthEnd) && !isBefore(eRaw, monthStart);
+                const endIdx = isAfter(eRaw, monthEnd) ? totalDays - 1 : differenceInDays(eRaw, monthStart);
+                if (endIdx < startIdx) return;
+                segs.push({ startIdx, endIdx, inclusiveEnd: !closedInMonth, type, name, color: type === 'planned' ? '#9C7B36' : timelineColor(seed), from: startDate, to: endDate, assignment });
+              };
+
+              if (driver) {
+                carAssignments.filter(a => a.driverId === driver.id).forEach(a => pushSeg(a.startDate, a.endDate, 'active', a.carNumber, a.carNumber, a));
+                plans.filter(p => p.status === 'Suplanuota' && p.incomingDriverId === driver.id)
+                  .forEach(p => pushSeg(p.date, p.newPlannedReturnDate ?? format(addDays(parseISO(p.date), 42), 'yyyy-MM-dd'), 'planned', p.carNumber, p.carNumber));
+              }
+              if (car) {
+                carAssignments.filter(a => a.carNumber === car.number).forEach(a => pushSeg(a.startDate, a.endDate, 'active', a.driverName, a.driverId, a));
+                plans.filter(p => p.status === 'Suplanuota' && p.carNumber === car.number)
+                  .forEach(p => pushSeg(p.date, p.newPlannedReturnDate ?? format(addDays(parseISO(p.date), 42), 'yyyy-MM-dd'), 'planned', p.incomingDriverName, p.incomingDriverId));
+              }
+
+              segs.sort((a, b) => a.startIdx - b.startIdx);
+              const handovers = segs
+                .filter((s, i) => s.type === 'active' && s.startIdx > 0 && segs.some((o, j) => j < i && o.endIdx <= s.startIdx))
+                .map(s => s.startIdx);
+              // Vienas „dabartinis" segmentas eilutėje: atviras (be pabaigos) su vėliausia pradžia.
+              const openActive = segs.filter(s => s.type === 'active' && s.to === null);
+              const currentSeg = openActive.length ? openActive.reduce((a, b) => (b.startIdx >= a.startIdx ? b : a)) : null;
+
+              const d = driver, c = car;
+
               return (
-                <div key={d.toString()} className={cn("flex-1 py-2 text-center border-r border-white/5", today && "bg-gold/30", weekend && !today && "bg-white/5")}>
-                  <div className="text-[7px] uppercase opacity-50">{format(d, 'EEE', { locale: lt })}</div>
-                  <div className="text-[9px] font-semibold">{format(d, 'd')}</div>
+                <div key={(d || c)!.id} className="flex group hover:bg-canvas/60 transition-colors h-14">
+                  <div className="w-48 shrink-0 px-4 flex items-center gap-2.5 border-r border-hairline">
+                    <div className={cn("w-2 h-2 rounded-full shrink-0", d ? (d.status === 'Reise' ? 'bg-blue-400' : 'bg-emerald-400') : 'bg-gold')} />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold truncate">{d ? d.name : c!.number}</p>
+                      <p className="text-[10px] text-muted truncate">{d ? (d.status === 'Reise' && d.currentCar !== 'Nėra' ? d.currentCar : 'Namuose') : `${c!.type} • ${c!.registration}`}</p>
+                    </div>
+                  </div>
+                  <div className="flex-1 relative">
+                    {/* dienų tinklelis */}
+                    {days.map((day, i) => (
+                      <div key={i} className={cn("absolute top-0 bottom-0 border-r border-hairline/60", isSameDay(day, new Date()) && "bg-gold/10")} style={{ left: pct(i), width: pct(1) }} />
+                    ))}
+
+                    {/* segmentai: dabartinis (žiedas) · praeitis (blankesnis) · planuojama (punktyras) */}
+                    {segs.map((seg, idx) => {
+                      const widthDays = (seg.endIdx - seg.startIdx) + (seg.inclusiveEnd ? 1 : 0);
+                      if (widthDays <= 0) return null;
+                      const planned = seg.type === 'planned';
+                      const isCurrent = seg === currentSeg;
+                      const isPast = seg.type === 'active' && !isCurrent;
+                      const clickable = seg.type === 'active' && !!onEditAssignment && !!seg.assignment;
+                      return (
+                        <div
+                          key={idx}
+                          onClick={clickable ? () => onEditAssignment!(seg.assignment!) : undefined}
+                          className={cn(
+                            "absolute top-2.5 bottom-2.5 rounded-lg flex items-center gap-1 px-2 overflow-hidden shadow-card transition-all",
+                            planned && "border border-dashed border-gold/70",
+                            isCurrent && "ring-2 ring-gold/80",
+                            isPast && "opacity-60",
+                            clickable && "cursor-pointer hover:opacity-100 hover:brightness-110",
+                          )}
+                          style={{ left: pct(seg.startIdx), width: `calc(${pct(widthDays)} - 2px)`, background: planned ? 'transparent' : seg.color, color: planned ? '#9C7B36' : 'white' }}
+                          title={`${seg.name} · nuo ${seg.from}${seg.to ? ` iki ${seg.to}` : ' (dabar)'}${planned ? ' · planuojama' : isCurrent ? ' · dabartinis' : ' · istorija'}${clickable ? ' · spausk redaguoti' : ''}`}
+                        >
+                          {planned && <span className="text-[9px] leading-none shrink-0">⟳</span>}
+                          <span className="truncate text-[10px] font-semibold leading-none">{planned ? `Planuojama · ${seg.name}` : seg.name}</span>
+                        </div>
+                      );
+                    })}
+
+                    {/* perdavimo žymekliai su diena */}
+                    {handovers.map((hi, k) => (
+                      <div key={`h${k}`} className="absolute top-0 bottom-0 z-10 pointer-events-none" style={{ left: pct(hi) }}>
+                        <div className="absolute top-0 bottom-0 w-[2px] -translate-x-1/2 bg-gold" />
+                        <div className="absolute top-0 left-0 -translate-x-1/2 bg-gold text-white text-[8px] font-bold leading-none px-1 py-0.5 rounded-b-md">
+                          {format(addDays(monthStart, hi), 'd')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               );
             })}
           </div>
-        </div>
-
-        {/* Rows */}
-        <div className="divide-y divide-hairline">
-          {(showCars ? cars : drivers).map(item => {
-            const driver = !showCars ? item as Driver : null;
-            const car    = showCars  ? item as Car    : null;
-
-            const segs: TLSegment[] = [];
-
-            const pushSeg = (startDate: string, endDate: string | null, type: 'active' | 'planned', name: string, seed: string) => {
-              const s = parseISO(startDate);
-              const eRaw = endDate ? parseISO(endDate) : monthEnd;
-              if (isAfter(s, monthEnd) || isBefore(eRaw, monthStart)) return;
-              const startIdx = isBefore(s, monthStart) ? 0 : differenceInDays(s, monthStart);
-              // endDate yra perdavimo diena (kitas vairuotojas pradeda) → ribą laikom išskirtine,
-              // nebent segmentas tęsiasi už mėnesio ribų arba neturi pabaigos (atviras).
-              const closedInMonth = !!endDate && !isAfter(eRaw, monthEnd) && !isBefore(eRaw, monthStart);
-              const endIdx = isAfter(eRaw, monthEnd) ? totalDays - 1 : differenceInDays(eRaw, monthStart);
-              if (endIdx < startIdx) return;
-              segs.push({ startIdx, endIdx, inclusiveEnd: !closedInMonth, type, name, color: type === 'planned' ? '#9C7B36' : timelineColor(seed), from: startDate, to: endDate });
-            };
-
-            if (driver) {
-              carAssignments.filter(a => a.driverId === driver.id).forEach(a => pushSeg(a.startDate, a.endDate, 'active', a.carNumber, a.carNumber));
-              plans.filter(p => p.status === 'Suplanuota' && p.incomingDriverId === driver.id)
-                .forEach(p => pushSeg(p.date, p.newPlannedReturnDate ?? format(addDays(parseISO(p.date), 42), 'yyyy-MM-dd'), 'planned', p.carNumber, p.carNumber));
-            }
-            if (car) {
-              carAssignments.filter(a => a.carNumber === car.number).forEach(a => pushSeg(a.startDate, a.endDate, 'active', a.driverName, a.driverId));
-              plans.filter(p => p.status === 'Suplanuota' && p.carNumber === car.number)
-                .forEach(p => pushSeg(p.date, p.newPlannedReturnDate ?? format(addDays(parseISO(p.date), 42), 'yyyy-MM-dd'), 'planned', p.incomingDriverName, p.incomingDriverId));
-            }
-
-            segs.sort((a, b) => a.startIdx - b.startIdx);
-            // Perdavimo taškai: aktyvaus segmento pradžia, kai prieš tai jau buvo kitas segmentas.
-            const handovers = segs
-              .filter((s, i) => s.type === 'active' && s.startIdx > 0 && segs.some((o, j) => j < i && o.endIdx <= s.startIdx))
-              .map(s => s.startIdx);
-
-            const d = driver, c = car;
-
-            return (
-              <div key={(d || c)!.id} className="flex group hover:bg-canvas/60 transition-colors h-14">
-                <div className="w-48 shrink-0 px-4 flex items-center gap-2.5 border-r border-hairline">
-                  <div className={cn("w-2 h-2 rounded-full shrink-0", d ? (d.status === 'Reise' ? 'bg-blue-400' : 'bg-emerald-400') : 'bg-gold')} />
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold truncate">{d ? d.name : c!.number}</p>
-                    <p className="text-[10px] text-muted truncate">{d ? (d.currentCar !== 'Nėra' ? d.currentCar : 'Namuose') : `${c!.type} • ${c!.registration}`}</p>
-                  </div>
-                </div>
-                <div className="flex-1 relative">
-                  {/* dienų tinklelis */}
-                  {days.map((day, i) => (
-                    <div key={i} className={cn("absolute top-0 bottom-0 border-r border-hairline/60", isSameDay(day, new Date()) && "bg-gold/10")} style={{ left: pct(i), width: pct(1) }} />
-                  ))}
-
-                  {/* segmentai */}
-                  {segs.map((seg, idx) => {
-                    const widthDays = (seg.endIdx - seg.startIdx) + (seg.inclusiveEnd ? 1 : 0);
-                    if (widthDays <= 0) return null;
-                    const planned = seg.type === 'planned';
-                    return (
-                      <div
-                        key={idx}
-                        className={cn("absolute top-2.5 bottom-2.5 rounded-lg flex items-center px-2 overflow-hidden text-white shadow-card", planned && "border border-dashed border-gold/70")}
-                        style={{ left: pct(seg.startIdx), width: `calc(${pct(widthDays)} - 2px)`, background: planned ? 'transparent' : seg.color, color: planned ? '#9C7B36' : 'white' }}
-                        title={`${seg.name} · nuo ${seg.from}${seg.to ? ` iki ${seg.to}` : ' (dabar)'}${planned ? ' · planuojama' : ''}`}
-                      >
-                        <span className="truncate text-[10px] font-semibold leading-none">{seg.name}</span>
-                      </div>
-                    );
-                  })}
-
-                  {/* perdavimo žymekliai su diena */}
-                  {handovers.map((hi, k) => (
-                    <div key={`h${k}`} className="absolute top-0 bottom-0 z-10 pointer-events-none" style={{ left: pct(hi) }}>
-                      <div className="absolute top-0 bottom-0 w-[2px] -translate-x-1/2 bg-gold" />
-                      <div className="absolute -top-0 left-0 -translate-x-1/2 -translate-y-0 bg-gold text-white text-[8px] font-bold leading-none px-1 py-0.5 rounded-b-md">
-                        {format(addDays(monthStart, hi), 'd')}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
         </div>
       </div>
     </div>
