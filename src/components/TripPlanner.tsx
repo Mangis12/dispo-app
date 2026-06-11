@@ -9,7 +9,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import type { Driver, Car, ReplacementPlan, TripVehicle, TripStop, RouteInfo } from '../types';
+import type { Driver, Car, ReplacementPlan, TripVehicle, TripStop, RouteInfo, TaskPoint } from '../types';
 
 function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
 
@@ -44,10 +44,12 @@ interface TripPlannerProps {
   drivers: Driver[];
   plans: ReplacementPlan[];
   cars?: Car[];
+  taskPoints?: TaskPoint[];
+  onConsumeTask?: (id: string) => void;
   showToast?: (msg: string, type?: 'success' | 'error') => void;
 }
 
-export default function TripPlanner({ drivers, plans, cars = [], showToast }: TripPlannerProps) {
+export default function TripPlanner({ drivers, plans, cars = [], taskPoints = [], onConsumeTask, showToast }: TripPlannerProps) {
   const [tripFleet, setTripFleet] = useState<TripVehicle[]>([mkVehicle(0)]);
   const [activeVehIdx, setActiveVehIdx] = useState(0);
   const [tripSearch, setTripSearch] = useState('');
@@ -75,7 +77,8 @@ export default function TripPlanner({ drivers, plans, cars = [], showToast }: Tr
   const loadedPlanIds = new Set(tripFleet.flatMap((v) => v.stops.map((s) => s.planId)));
   const plannedPoints = plans.filter((p) => p.status === 'Suplanuota' && p.changeLat != null && p.changeLng != null);
 
-  // Įkelti koordinatoriaus tašką į aktyvų transportą — su jau suplanuotu vairuotoju.
+  // Įkelti koordinatoriaus keitimo tašką į aktyvų transportą — su jau suplanuotu
+  // vairuotoju; jei taškas turi papildomą užduotį (changeTask) → dviguba: keitimas + užduotis.
   const loadPointIntoActive = (plan: ReplacementPlan) => {
     if (plan.changeLat == null || plan.changeLng == null) return;
     if (loadedPlanIds.has(plan.id)) { showT('Šis taškas jau įkeltas', 'error'); return; }
@@ -84,10 +87,28 @@ export default function TripPlanner({ drivers, plans, cars = [], showToast }: Tr
     setTripFleet((p) => p.map((v) => (v.id === vid
       ? { ...v, stops: [...v.stops, {
           id: stopIdx.current++, lat: plan.changeLat!, lng: plan.changeLng!, city: plan.changeLocation || 'Keitimo taškas',
-          type: 'driver', driverId: plan.incomingDriverId, planId: plan.id, addWork: '',
+          type: 'driver', driverId: plan.incomingDriverId, planId: plan.id, addWork: plan.changeTask || '',
         }] }
       : v)));
-    showT(`${plan.carNumber} → ${activeVeh.number || 'transportas'}`);
+    showT(plan.changeTask ? `${plan.carNumber}: keitimas + užduotis → ${activeVeh.number || 'transportas'}` : `${plan.carNumber} → ${activeVeh.number || 'transportas'}`);
+  };
+
+  // Aktyvios papildomos užduotys (su vieta) — atkeliauja iš koordinatoriaus.
+  const activeTasks = taskPoints.filter((t) => t.active && t.lat != null && t.lng != null);
+  const loadedTaskIds = new Set(tripFleet.flatMap((v) => v.stops.map((s) => s.planId).filter((id) => id.startsWith('TASK:')).map((id) => id.slice(5))));
+  const loadTaskIntoActive = (t: TaskPoint) => {
+    if (t.lat == null || t.lng == null) return;
+    if (loadedTaskIds.has(t.id)) { showT('Ši užduotis jau įkelta', 'error'); return; }
+    if (activeVeh.stops.length >= activeVeh.capacity) { showT('Pasiekta transporto talpa', 'error'); return; }
+    const vid = activeVeh.id;
+    setTripFleet((p) => p.map((v) => (v.id === vid
+      ? { ...v, stops: [...v.stops, {
+          id: stopIdx.current++, lat: t.lat!, lng: t.lng!, city: t.location || t.title,
+          type: 'task', driverId: '', planId: `TASK:${t.id}`, addWork: '', taskDesc: t.description || t.title,
+        }] }
+      : v)));
+    onConsumeTask?.(t.id);
+    showT(`Užduotis „${t.title}" → ${activeVeh.number || 'transportas'}`);
   };
 
   // ── Floto pagalbininkai ──────────────────────────────────────────────────
@@ -308,9 +329,11 @@ export default function TripPlanner({ drivers, plans, cars = [], showToast }: Tr
                     <div className="flex items-center gap-1.5">
                       <span className="font-mono text-[11px] font-bold bg-[#003087] text-white px-1.5 py-0.5 rounded">{p.carNumber}</span>
                       {carType(p.carNumber) && <span className="text-[10px] text-slate-400">{carType(p.carNumber)}</span>}
+                      {p.changeTask && <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">📦 +užduotis</span>}
                     </div>
                     <p className="text-xs font-semibold truncate mt-1">📍 {p.changeLocation}</p>
                     <p className="text-[11px] text-slate-500 truncate">{p.incomingDriverName} ↔ {p.leavingDriverName}</p>
+                    {p.changeTask && <p className="text-[10px] text-amber-600 truncate">📦 {p.changeTask}</p>}
                   </div>
                   {loaded ? (
                     <span className="shrink-0 text-[10px] font-bold text-emerald-600 inline-flex items-center gap-1">✓ Įkelta</span>
@@ -319,6 +342,37 @@ export default function TripPlanner({ drivers, plans, cars = [], showToast }: Tr
                       className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-[#9C7B36] hover:bg-[#876829] transition-colors">
                       + Į transportą
                     </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Koordinatoriaus papildomos užduotys */}
+      {activeTasks.length > 0 && (
+        <div className="bg-surface rounded-2xl border border-amber-300/50 overflow-hidden shadow-sm">
+          <div className="px-4 py-3 flex items-center gap-2 bg-amber-50 border-b border-amber-200">
+            <span className="text-base">📦</span>
+            <p className="text-sm font-bold text-amber-800">Papildomos užduotys</p>
+            <span className="text-xs text-amber-600 font-semibold">{activeTasks.filter((t) => !loadedTaskIds.has(t.id)).length} laukia</span>
+            <span className="ml-auto text-[11px] text-slate-400">Iš koordinatoriaus — užvažiavimai / pristatymai</span>
+          </div>
+          <div className="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+            {activeTasks.map((t) => {
+              const loaded = loadedTaskIds.has(t.id);
+              return (
+                <div key={t.id} className={cn('border rounded-xl p-2.5 flex items-center gap-2.5', loaded ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50/50 border-amber-200')}>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold truncate">📦 {t.title}</p>
+                    <p className="text-[11px] text-slate-500 truncate">📍 {t.location}</p>
+                    {t.description && <p className="text-[10px] text-slate-400 truncate">{t.description}</p>}
+                  </div>
+                  {loaded ? (
+                    <span className="shrink-0 text-[10px] font-bold text-emerald-600">✓ Įkelta</span>
+                  ) : (
+                    <button onClick={() => loadTaskIntoActive(t)} className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white bg-amber-500 hover:bg-amber-600 transition-colors">+ Į transportą</button>
                   )}
                 </div>
               );

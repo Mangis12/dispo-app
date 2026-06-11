@@ -53,6 +53,22 @@ export interface ReplacementPlan {
   changeLat?: number | null;
   changeLng?: number | null;
   changeLocation?: string | null;
+  // Papildoma užduotis tame pačiame taške (pvz. nuvežti dokumentus) →
+  // Kelionėje atvyksta kaip dviguba: keitimas + užduotis.
+  changeTask?: string | null;
+}
+
+// Koordinatoriaus papildoma užduotis su vieta. Gali būti išsaugota (pasikartojanti)
+// daugkartiniam naudojimui. Aktyvios užduotys atkeliauja į Kelionės skiltį.
+export interface TaskPoint {
+  id: string;
+  title: string;
+  description: string;
+  lat: number | null;
+  lng: number | null;
+  location: string;
+  saved: boolean;   // išsaugotas šablonas ateičiai (pasikartojantis)
+  active: boolean;  // šiuo metu siunčiamas į Kelionę
 }
 
 export interface CarAssignment {

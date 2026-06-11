@@ -20,7 +20,7 @@ import TripPlanner from './components/TripPlanner';
 import CoordinatorBoard from './components/CoordinatorBoard';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
-  ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment
+  ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment, TaskPoint
 } from './types';
 
 function cn(...inputs: ClassValue[]) {
@@ -168,9 +168,10 @@ export default function App() {
   const [history, setHistory]           = useState<HistoryEntry[]>([]);
   const [plans, setPlans]               = useState<ReplacementPlan[]>([]);
   const [carAssignments, setCarAssignments] = useState<CarAssignment[]>([]);
+  const [taskPoints, setTaskPoints]     = useState<TaskPoint[]>([]);
   const [loaded, setLoaded]             = useState(false);
   // Paskutinė su saugykla suderinta būsena — naudojama syncCollection diff'ui.
-  const prevSnap = useRef<AllData>({ drivers: [], cars: [], history: [], plans: [], carAssignments: [] });
+  const prevSnap = useRef<AllData>({ drivers: [], cars: [], history: [], plans: [], carAssignments: [], taskPoints: [] });
 
   const [activeTab, setActiveTab]       = useState<Tab>('dashboard');
   const [sidebarOpen, setSidebarOpen]   = useState(false);
@@ -225,7 +226,7 @@ export default function App() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await loadAll({ drivers: INITIAL_DRIVERS, cars: INITIAL_CARS, history: [], plans: [], carAssignments: [] });
+        const data = await loadAll({ drivers: INITIAL_DRIVERS, cars: INITIAL_CARS, history: [], plans: [], carAssignments: [], taskPoints: [] });
         if (cancelled) return;
         // Dedup planų ir, jei priskyrimų nėra — išvedame iš „Reise" vairuotojų.
         const dedupPlans = data.plans.filter((p, i, a) => i === a.findIndex(x => x.carNumber === p.carNumber && x.date === p.date && x.leavingDriverId === p.leavingDriverId && x.incomingDriverId === p.incomingDriverId));
@@ -238,12 +239,13 @@ export default function App() {
           }));
         }
         // prevSnap = neapdorota įkelta būsena; skirtumai (dedup/išvesti priskyrimai) įsirašys per sync.
-        prevSnap.current = { drivers: data.drivers, cars: data.cars, history: data.history, plans: data.plans, carAssignments: data.carAssignments };
+        prevSnap.current = { drivers: data.drivers, cars: data.cars, history: data.history, plans: data.plans, carAssignments: data.carAssignments, taskPoints: data.taskPoints };
         setDrivers(data.drivers);
         setCars(data.cars);
         setHistory(data.history);
         setPlans(dedupPlans);
         setCarAssignments(assignments);
+        setTaskPoints(data.taskPoints);
       } catch (e) {
         if (!cancelled) setToast({ message: e instanceof Error ? e.message : 'Klaida kraunant duomenis', type: 'error' });
       } finally {
@@ -264,14 +266,15 @@ export default function App() {
           await syncCollection('history', prevSnap.current.history, history);
           await syncCollection('plans', prevSnap.current.plans, plans);
           await syncCollection('carAssignments', prevSnap.current.carAssignments, carAssignments);
-          prevSnap.current = { drivers, cars, history, plans, carAssignments };
+          await syncCollection('taskPoints', prevSnap.current.taskPoints, taskPoints);
+          prevSnap.current = { drivers, cars, history, plans, carAssignments, taskPoints };
         } catch (e) {
           setToast({ message: e instanceof Error ? e.message : 'Sinchronizacijos klaida', type: 'error' });
         }
       })();
     }, 400);
     return () => clearTimeout(id);
-  }, [drivers, cars, history, plans, carAssignments, loaded]);
+  }, [drivers, cars, history, plans, carAssignments, taskPoints, loaded]);
 
   // ── Realaus laiko prenumerata (kitų vartotojų pakeitimai) ────────────────────
   useEffect(() => {
@@ -282,6 +285,7 @@ export default function App() {
       history:        (rows) => { prevSnap.current.history = rows;        setHistory(rows); },
       plans:          (rows) => { prevSnap.current.plans = rows;          setPlans(rows); },
       carAssignments: (rows) => { prevSnap.current.carAssignments = rows; setCarAssignments(rows); },
+      taskPoints:     (rows) => { prevSnap.current.taskPoints = rows;     setTaskPoints(rows); },
     });
   }, [loaded]);
 
@@ -568,8 +572,30 @@ export default function App() {
     if (p) showToast(`Keitimo taškas: ${p.carNumber} → ${location}`);
   };
   const clearPlanChangePoint = (planId: string) => {
-    setPlans(prev => prev.map(p => p.id === planId ? { ...p, changeLat: null, changeLng: null, changeLocation: null } : p));
+    setPlans(prev => prev.map(p => p.id === planId ? { ...p, changeLat: null, changeLng: null, changeLocation: null, changeTask: null } : p));
     showToast('Keitimo taškas pašalintas');
+  };
+  // Dviguba užduotis ant keitimo taško (keitimas + ką nuvežti) — eina į Kelionę kartu.
+  const setPlanChangeTask = (planId: string, task: string) => {
+    setPlans(prev => prev.map(p => p.id === planId ? { ...p, changeTask: task || null } : p));
+  };
+
+  // ── Koordinatoriaus papildomos užduotys (task points) ──
+  const addTaskPoint = (t: Omit<TaskPoint, 'id'>) => {
+    const id = uid();
+    setTaskPoints(prev => [...prev, { ...t, id }]);
+    showToast(t.saved ? `Užduotis išsaugota: ${t.title || t.location}` : `Užduotis pridėta: ${t.title || t.location}`);
+    return id;
+  };
+  const updateTaskPoint = (id: string, updates: Partial<TaskPoint>) =>
+    setTaskPoints(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+  const deleteTaskPoint = (id: string) => {
+    setTaskPoints(prev => prev.filter(t => t.id !== id));
+    showToast('Užduotis pašalinta');
+  };
+  // Iš išsaugoto šablono sukuriam aktyvią (siunčiamą į Kelionę) užduotį.
+  const activateSavedTask = (tpl: TaskPoint) => {
+    addTaskPoint({ title: tpl.title, description: tpl.description, lat: tpl.lat, lng: tpl.lng, location: tpl.location, saved: false, active: true });
   };
 
   // ── El. laiško su savaitės planais turinys (mailto) ──
@@ -1395,15 +1421,16 @@ export default function App() {
         {/* ══════════════════ KOORDINATORIUS (keitimo taškai) ══════════════════ */}
         {activeTab === 'coordinator' && (
           <CoordinatorBoard
-            plans={plans} cars={cars} drivers={drivers}
-            onSetPoint={setPlanChangePoint} onClearPoint={clearPlanChangePoint}
+            plans={plans} cars={cars} drivers={drivers} taskPoints={taskPoints}
+            onSetPoint={setPlanChangePoint} onClearPoint={clearPlanChangePoint} onSetPlanTask={setPlanChangeTask}
+            onAddTask={addTaskPoint} onUpdateTask={updateTaskPoint} onDeleteTask={deleteTaskPoint} onActivateSaved={activateSavedTask}
             onGoTrip={() => setActiveTab('trip')}
           />
         )}
 
         {/* ══════════════════ KELIONĖ (žemėlapis) ══════════════════ */}
         {activeTab === 'trip' && (
-          <TripPlanner drivers={drivers} plans={plans} cars={cars} showToast={(msg, type) => setToast({ message: msg, type: type ?? 'success' })} />
+          <TripPlanner drivers={drivers} plans={plans} cars={cars} taskPoints={taskPoints} onConsumeTask={(id) => updateTaskPoint(id, { active: false })} showToast={(msg, type) => setToast({ message: msg, type: type ?? 'success' })} />
         )}
 
         {/* Reset */}

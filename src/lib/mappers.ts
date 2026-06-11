@@ -3,7 +3,7 @@
 // tad jo nesiunčiame; from-row jį ignoruoja.
 
 import type {
-  Driver, Car, HistoryEntry, ReplacementPlan, CarAssignment,
+  Driver, Car, HistoryEntry, ReplacementPlan, CarAssignment, TaskPoint,
 } from '../types';
 
 type Row = Record<string, unknown>;
@@ -95,6 +95,7 @@ export const planToRow = (p: ReplacementPlan): Row => ({
   change_lat: p.changeLat ?? null,
   change_lng: p.changeLng ?? null,
   change_location: p.changeLocation ?? null,
+  change_task: p.changeTask ?? null,
 });
 
 export const planFromRow = (r: Row): ReplacementPlan => ({
@@ -110,6 +111,30 @@ export const planFromRow = (r: Row): ReplacementPlan => ({
   changeLat: (r.change_lat as number | null) ?? null,
   changeLng: (r.change_lng as number | null) ?? null,
   changeLocation: (r.change_location as string | null) ?? null,
+  changeTask: (r.change_task as string | null) ?? null,
+});
+
+// ── TaskPoint ────────────────────────────────────────────────────────────────
+export const taskPointToRow = (t: TaskPoint): Row => ({
+  id: t.id,
+  title: t.title,
+  description: t.description,
+  lat: t.lat,
+  lng: t.lng,
+  location: t.location,
+  saved: t.saved,
+  active: t.active,
+});
+
+export const taskPointFromRow = (r: Row): TaskPoint => ({
+  id: String(r.id),
+  title: String(r.title ?? ''),
+  description: String(r.description ?? ''),
+  lat: (r.lat as number | null) ?? null,
+  lng: (r.lng as number | null) ?? null,
+  location: String(r.location ?? ''),
+  saved: Boolean(r.saved),
+  active: Boolean(r.active),
 });
 
 // ── CarAssignment ────────────────────────────────────────────────────────────
@@ -138,6 +163,7 @@ export const TABLES = {
   history:         { table: 'history',         toRow: historyToRow,    fromRow: historyFromRow },
   plans:           { table: 'plans',           toRow: planToRow,       fromRow: planFromRow },
   carAssignments:  { table: 'car_assignments', toRow: assignmentToRow, fromRow: assignmentFromRow },
+  taskPoints:      { table: 'task_points',     toRow: taskPointToRow,  fromRow: taskPointFromRow },
 } as const;
 
 export type CollectionKey = keyof typeof TABLES;
