@@ -199,6 +199,7 @@ export default function App() {
   const [selectedCarForEdit, setSelectedCarForEdit]         = useState<Car | null>(null);
   const [editAssignment, setEditAssignment]                 = useState<CarAssignment | null>(null);
   const [planGroup, setPlanGroup]                           = useState<'all' | CarType>('all');
+  const [planWeek, setPlanWeek]                             = useState<'all' | 'this' | 'next'>('all');
   const [emailGroup, setEmailGroup]                         = useState<CarType | null>(null);
   const [emailTo, setEmailTo]                               = useState('');
   const [emailWeeks, setEmailWeeks]                         = useState<1 | 2>(2);
@@ -742,7 +743,7 @@ export default function App() {
               {namuoseDrivers.length === 0
                 ? <EmptyState icon={<Users size={28}/>} text="Visi vairuotojai reise" />
                 : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-2">
                     {namuoseDrivers.map(d => (
                       <HomeDriverCard key={d.id} driver={d} onSendToTrip={() => { setSelectedDriverForTrip(d); setTripOpen(true); }} />
                     ))}
@@ -837,7 +838,7 @@ export default function App() {
                     {potentialReplacements.length === 0 && <p className="text-xs text-muted italic py-4 text-center">Nėra laisvų vairuotojų</p>}
                     {potentialReplacements.map(d => {
                       const isPlanned = plans.some(p => p.incomingDriverId === d.id && p.status === 'Suplanuota');
-                      const daysHome  = d.lastTripEndDate ? differenceInDays(new Date(), parseISO(d.lastTripEndDate)) : null;
+                      const ready = d.readinessDate ? !isAfter(parseISO(d.readinessDate), new Date()) : true;
                       const fit = specFit(d, replaceTarget?.carType ?? '');
                       const sameCompany = !!replaceTarget && d.companyType === replaceTarget.company;
                       return (
@@ -847,7 +848,9 @@ export default function App() {
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                               <Badge variant={fit === 0 ? 'green' : fit === 1 ? 'blue' : 'default'}>{d.specialization}</Badge>
                               <Badge variant={sameCompany ? 'green' : 'default'}>{d.companyType}</Badge>
-                              <span className="text-[10px] text-muted">Nuo: {d.readinessDate || '?'}{daysHome !== null ? ` (${daysHome}d. namuose)` : ''}</span>
+                              <span className={cn("text-[10px]", ready ? "text-emerald-600 font-medium" : "text-muted")}>
+                                {ready ? 'Galima siųsti' : `Poilsiauja iki ${d.readinessDate || '—'}`}{d.homeStatus && d.homeStatus !== 'Nėra' ? ` · ${d.homeStatus}` : ''}
+                              </span>
                             </div>
                           </div>
                           {isPlanned ? (
@@ -926,7 +929,10 @@ export default function App() {
             {/* Planai pagal grupes (Tentai / Refai) + el. paštas + įvykdyti su atšaukimu */}
             {(activePlans.length > 0 || plans.some(p => p.status === 'Atlikta')) && (() => {
               const typeOf = (p: ReplacementPlan) => cars.find(c => c.number === p.carNumber)?.type;
-              const shown = activePlans.filter(p => planGroup === 'all' || typeOf(p) === planGroup).sort((a, b) => a.date.localeCompare(b.date));
+              const wkFrom = startOfWeek(addWeeks(new Date(), planWeek === 'next' ? 1 : 0), { weekStartsOn: 1 });
+              const wkTo   = endOfWeek(addWeeks(new Date(), planWeek === 'next' ? 1 : 0), { weekStartsOn: 1 });
+              const inWeek = (p: ReplacementPlan) => { if (planWeek === 'all') return true; const dt = parseISO(p.date); return !isBefore(dt, wkFrom) && !isAfter(dt, wkTo); };
+              const shown = activePlans.filter(p => (planGroup === 'all' || typeOf(p) === planGroup) && inWeek(p)).sort((a, b) => a.date.localeCompare(b.date));
               const done  = plans.filter(p => p.status === 'Atlikta').sort((a, b) => b.date.localeCompare(a.date));
               return (
                 <div className="bg-surface rounded-2xl border border-hairline p-6 space-y-4">
@@ -937,6 +943,12 @@ export default function App() {
                         {([['all', 'Visi'], ['Tentas', 'Tentai'], ['Refas', 'Refai']] as const).map(([g, lbl]) => (
                           <button key={g} onClick={() => setPlanGroup(g)}
                             className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all", planGroup === g ? "bg-ink text-white" : "text-muted hover:text-ink")}>{lbl}</button>
+                        ))}
+                      </div>
+                      <div className="flex bg-canvas p-1 rounded-xl gap-1">
+                        {([['all', 'Visada'], ['this', 'Ši sav.'], ['next', 'Kita sav.']] as const).map(([w, lbl]) => (
+                          <button key={w} onClick={() => setPlanWeek(w)}
+                            className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all", planWeek === w ? "bg-gold text-white" : "text-muted hover:text-ink")}>{lbl}</button>
                         ))}
                       </div>
                       <button onClick={() => setEmailGroup('Tentas')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-hairline text-ink hover:border-ink/25 transition-all"><Mail size={13}/> Tentai</button>
@@ -1610,34 +1622,23 @@ function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }) {
 }
 
 function HomeDriverCard({ driver, onSendToTrip }: { driver: Driver; onSendToTrip: () => void }) {
-  const daysHome = driver.lastTripEndDate ? differenceInDays(new Date(), parseISO(driver.lastTripEndDate)) : null;
+  // Ar jau galima siųsti (poilsis pasibaigęs)?
+  const ready = driver.readinessDate ? !isAfter(parseISO(driver.readinessDate), new Date()) : true;
   return (
-    <div className="bg-surface rounded-2xl border border-hairline p-4 group hover:border-ink/25 transition-colors">
-      <div className="flex items-start justify-between mb-3">
-        <div className="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-semibold text-sm">
-          {driver.name.charAt(0)}
-        </div>
-        <Badge variant={driver.homeStatus === 'Tvarko dokumentus' ? 'amber' : 'green'}>{driver.homeStatus}</Badge>
+    <div className="group flex items-center gap-3 bg-surface rounded-xl border border-hairline pl-2.5 pr-2 py-2 hover:border-ink/25 transition-colors">
+      <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-semibold text-xs shrink-0">
+        {driver.name.charAt(0)}
       </div>
-      <p className="font-semibold text-sm mb-1">{driver.name}</p>
-      <div className="flex gap-1 mb-3">
-        <Badge>{driver.companyType}</Badge>
-        <Badge variant="blue">{driver.specialization}</Badge>
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold text-[13px] truncate leading-tight">{driver.name}</p>
+        <p className="text-[10px] text-muted truncate mt-0.5">{driver.companyType} · {driver.specialization} · {driver.homeStatus}</p>
       </div>
-      <div className="space-y-1.5 text-[11px]">
-        <div className="flex justify-between">
-          <span className="text-muted">Gali nuo</span>
-          <span className="font-semibold text-blue-600">{driver.readinessDate || '?'}</span>
-        </div>
-        {daysHome !== null && (
-          <div className="flex justify-between">
-            <span className="text-muted">Namuose</span>
-            <span className="font-semibold">{daysHome} d.</span>
-          </div>
-        )}
+      <div className="text-right shrink-0 leading-tight">
+        <p className="text-[8px] uppercase tracking-wide text-muted">{ready ? 'Galima' : 'Poilsis iki'}</p>
+        <p className={cn("text-[11px] font-semibold tabular-nums", ready ? "text-emerald-600" : "text-blue-600")}>{driver.readinessDate || '—'}</p>
       </div>
-      <button onClick={onSendToTrip} className="w-full mt-3 py-2 bg-ink text-white text-[11px] font-medium rounded-xl opacity-0 group-hover:opacity-100 transition-all translate-y-1 group-hover:translate-y-0">
-        Į reisą →
+      <button onClick={onSendToTrip} title="Siųsti į reisą" className="shrink-0 w-8 h-8 rounded-lg bg-ink/[0.06] text-ink hover:bg-ink hover:text-white flex items-center justify-center transition-all">
+        <ArrowRight size={15}/>
       </button>
     </div>
   );
@@ -1803,7 +1804,7 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
               const d = driver, c = car;
 
               return (
-                <div key={(d || c)!.id} className="flex group hover:bg-canvas/60 transition-colors h-14">
+                <div key={(d || c)!.id} className="flex group hover:bg-canvas/60 transition-colors h-16">
                   <div className="w-48 shrink-0 px-4 flex items-center gap-2.5 border-r border-hairline">
                     <div className={cn("w-2 h-2 rounded-full shrink-0", d ? (d.status === 'Reise' ? 'bg-blue-400' : 'bg-emerald-400') : 'bg-gold')} />
                     <div className="min-w-0">
@@ -1830,17 +1831,18 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
                           key={idx}
                           onClick={clickable ? () => onEditAssignment!(seg.assignment!) : undefined}
                           className={cn(
-                            "absolute top-2.5 bottom-2.5 rounded-lg flex items-center gap-1 px-2 overflow-hidden shadow-card transition-all",
-                            planned && "border border-dashed border-gold/70",
+                            "absolute rounded-lg flex items-center gap-1 px-2 overflow-hidden shadow-card transition-all",
+                            // Atskiros juostos: faktinis viršuje, planuojamas apačioje — kad nepersidengtų
+                            planned ? "top-9 h-4 border border-dashed border-white/45" : "top-2 h-7",
                             isCurrent && "ring-2 ring-gold/80",
                             isPast && "opacity-60",
                             clickable && "cursor-pointer hover:opacity-100 hover:brightness-110",
                           )}
-                          style={{ left: pct(seg.startIdx), width: `calc(${pct(widthDays)} - 2px)`, background: planned ? 'transparent' : seg.color, color: planned ? '#9C7B36' : 'white' }}
+                          style={{ left: pct(seg.startIdx), width: `calc(${pct(widthDays)} - 2px)`, background: planned ? '#B08A3C' : seg.color, color: 'white' }}
                           title={`${seg.name} · nuo ${seg.from}${seg.to ? ` iki ${seg.to}` : ' (dabar)'}${planned ? ' · planuojama' : isCurrent ? ' · dabartinis' : ' · istorija'}${clickable ? ' · spausk redaguoti' : ''}`}
                         >
-                          {planned && <span className="text-[9px] leading-none shrink-0">⟳</span>}
-                          <span className="truncate text-[10px] font-semibold leading-none">{planned ? `Planuojama · ${seg.name}` : seg.name}</span>
+                          {planned && <span className="text-[8px] leading-none shrink-0">⟳</span>}
+                          <span className="truncate text-[10px] font-semibold leading-none">{seg.name}</span>
                         </div>
                       );
                     })}
