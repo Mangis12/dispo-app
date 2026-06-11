@@ -494,6 +494,45 @@ export default function App() {
     showToast('Priskyrimas ištrintas');
   };
 
+  // ── Grafiko „drag": priskyrimo (kadencijos) juostos pastūmimas dienomis ──
+  const shiftISO = (d: string, days: number) => format(addDays(parseISO(d), days), 'yyyy-MM-dd');
+  const moveAssignment = (a: CarAssignment, deltaDays: number) => {
+    if (!deltaDays) return;
+    setCarAssignments(prev => prev.map(x => x.id === a.id
+      ? { ...x, startDate: shiftISO(x.startDate, deltaDays), endDate: x.endDate ? shiftISO(x.endDate, deltaDays) : null }
+      : x));
+    // Atviram reisui pastumiam ir vairuotojo datas (pradžia + numatoma grįžimo data).
+    if (a.endDate == null) {
+      setDrivers(prev => prev.map(d => d.id === a.driverId
+        ? { ...d, startDate: d.startDate ? shiftISO(d.startDate, deltaDays) : d.startDate, plannedReturnDate: d.plannedReturnDate ? shiftISO(d.plannedReturnDate, deltaDays) : d.plannedReturnDate }
+        : d));
+    }
+    logHistory(a.driverId, a.driverName, 'Grafikas pakoreguotas', `Auto: ${a.carNumber} pastumta ${deltaDays > 0 ? '+' : ''}${deltaDays} d.`, a.carNumber, shiftISO(a.startDate, deltaDays));
+    showToast(`${a.carNumber}: pastumta ${deltaDays > 0 ? '+' : ''}${deltaDays} d.`);
+  };
+
+  // ── Grafiko „drag": planuojamo keitimo data (horizontaliai) ──
+  const movePlanDate = (planId: string, deltaDays: number) => {
+    if (!deltaDays) return;
+    const p = plans.find(x => x.id === planId); if (!p) return;
+    setPlans(prev => prev.map(x => x.id === planId ? { ...x, date: shiftISO(x.date, deltaDays) } : x));
+    showToast(`Planas ${p.carNumber}: data ${deltaDays > 0 ? '+' : ''}${deltaDays} d.`);
+  };
+
+  // ── Grafiko „drag": planuojamo keitimo perkėlimas ant kitos mašinos ──
+  const movePlanToCar = (planId: string, newCar: string) => {
+    const p = plans.find(x => x.id === planId); if (!p || p.carNumber === newCar) return;
+    if (!cars.some(c => c.number === newCar)) return;
+    // Naujos mašinos dabartinis (atviras) vairuotojas tampa „išeinančiu".
+    const open = carAssignments.filter(x => x.carNumber === newCar && x.endDate == null);
+    const cur = open.length ? open.reduce((a, b) => (b.startDate >= a.startDate ? b : a)) : null;
+    setPlans(prev => prev.map(x => x.id === planId
+      ? { ...x, carNumber: newCar, leavingDriverId: cur?.driverId ?? 'NONE', leavingDriverName: cur?.driverName ?? '—' }
+      : x));
+    logHistory(p.incomingDriverId, p.incomingDriverName, 'Planas perkeltas', `${p.carNumber} → ${newCar}`, newCar, p.date);
+    showToast(`Planas perkeltas: ${p.carNumber} → ${newCar}`);
+  };
+
   // ── Koordinatorius: keitimo taško nustatymas / valymas plane ──
   const setPlanChangePoint = (planId: string, lat: number, lng: number, location: string) => {
     setPlans(prev => prev.map(p => p.id === planId ? { ...p, changeLat: lat, changeLng: lng, changeLocation: location } : p));
@@ -797,7 +836,7 @@ export default function App() {
               <SectionHeader icon={<LayoutDashboard size={18} className="text-violet-500"/>} title="Vairuotojų grafikas">
                 <MonthNav value={selectedMonth} onChange={setSelectedMonth} />
               </SectionHeader>
-              <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} onEditAssignment={setEditAssignment} />
+              <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} onEditAssignment={setEditAssignment} onMoveAssignment={moveAssignment} onMovePlanDate={movePlanDate} onMovePlanToCar={movePlanToCar} />
             </section>
           </div>
         )}
@@ -1208,7 +1247,7 @@ export default function App() {
                     <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Ateina</th>
                     <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Tipas</th>
                     <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Statusas</th>
-                    {historyMode === 'upcoming' && <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold text-right">Veiksmai</th>}
+                    <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold text-right">Veiksmai</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
@@ -1225,14 +1264,18 @@ export default function App() {
                         <td className="px-4 py-3 text-sm font-semibold">{plan.incomingDriverName}</td>
                         <td className="px-4 py-3"><Badge variant="blue">{car?.type || '?'}</Badge></td>
                         <td className="px-4 py-3"><Badge variant={plan.status === 'Suplanuota' ? 'blue' : 'green'}>{plan.status}</Badge></td>
-                        {historyMode === 'upcoming' && (
-                          <td className="px-4 py-3">
-                            <div className="flex justify-end gap-1.5">
-                              <button onClick={() => { setConfirmData({ carNumber: plan.carNumber, leavingId: plan.leavingDriverId, incomingId: plan.incomingDriverId, date: plan.date, driverName: plan.incomingDriverName, planId: plan.id, isExecution: true }); if (plan.newPlannedReturnDate) setNewReturnDate(plan.newPlannedReturnDate); }} className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-all"><CheckCircle2 size={13}/></button>
-                              <button onClick={() => deletePlan(plan.id)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Trash2 size={13}/></button>
-                            </div>
-                          </td>
-                        )}
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-1.5">
+                            {historyMode === 'upcoming' ? (
+                              <>
+                                <button onClick={() => { setConfirmData({ carNumber: plan.carNumber, leavingId: plan.leavingDriverId, incomingId: plan.incomingDriverId, date: plan.date, driverName: plan.incomingDriverName, planId: plan.id, isExecution: true }); if (plan.newPlannedReturnDate) setNewReturnDate(plan.newPlannedReturnDate); }} className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-all" title="Įvykdyti"><CheckCircle2 size={13}/></button>
+                                <button onClick={() => deletePlan(plan.id)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all" title="Ištrinti"><Trash2 size={13}/></button>
+                              </>
+                            ) : (
+                              <button onClick={() => { if (confirm(`Atšaukti įvykdytą pakeitimą ${plan.carNumber}?\n${plan.incomingDriverName} grįš namo, ${plan.leavingDriverName} — atgal į reisą.`)) undoCompletion(plan.id); }} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white rounded-lg transition-all text-xs font-semibold" title="Atšaukti įvykdymą"><Undo2 size={13}/> Atšaukti</button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
@@ -1317,7 +1360,7 @@ export default function App() {
             <div className="flex items-center justify-end">
               <MonthNav value={selectedMonth} onChange={setSelectedMonth} />
             </div>
-            <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} showCars onEditAssignment={setEditAssignment} />
+            <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} showCars onEditAssignment={setEditAssignment} onMoveAssignment={moveAssignment} onMovePlanDate={movePlanDate} onMovePlanToCar={movePlanToCar} />
           </div>
         )}
 
@@ -1728,17 +1771,69 @@ type TLSegment = {
   open?: boolean;          // tęsiamas reisas (assignment be pabaigos)
   estimated?: boolean;     // pabaiga = plannedReturnDate (numatoma grįžimo data)
   assignment?: CarAssignment;
+  planId?: string;         // planuojamo segmento plano id (perkėlimui)
+  planCar?: string;        // plano dabartinė mašina
 };
 
-function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars, onEditAssignment }: {
+function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars, onEditAssignment, onMoveAssignment, onMovePlanDate, onMovePlanToCar }: {
   drivers: Driver[]; cars: Car[]; plans: ReplacementPlan[]; carAssignments: CarAssignment[]; month: Date; showCars?: boolean;
   onEditAssignment?: (a: CarAssignment) => void;
+  onMoveAssignment?: (a: CarAssignment, deltaDays: number) => void;
+  onMovePlanDate?: (planId: string, deltaDays: number) => void;
+  onMovePlanToCar?: (planId: string, newCar: string) => void;
 }) {
   const monthStart = startOfMonth(month);
   const monthEnd   = endOfMonth(month);
   const totalDays  = getDaysInMonth(month);
   const days       = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const pct        = (n: number) => `${(n / totalDays) * 100}%`;
+
+  // ── Drag (pelės tempimas): kadencijos juostos pastūmimas / plano perkėlimas ──
+  const dragInfo = useRef<null | { seg: TLSegment; segKey: string; startX: number; startY: number; dayPx: number; moved: boolean }>(null);
+  const [drag, setDrag] = useState<null | { segKey: string; dx: number; dy: number; deltaDays: number; targetCar: string | null }>(null);
+  const canDrag = (s: TLSegment) =>
+    (s.type === 'active' && !!s.assignment && !!onMoveAssignment) ||
+    (s.type === 'planned' && !!s.planId && (!!onMovePlanDate || !!onMovePlanToCar));
+
+  const onSegDown = (e: React.PointerEvent, seg: TLSegment, segKey: string) => {
+    if (!canDrag(seg)) return;
+    const track = (e.currentTarget as HTMLElement).closest('[data-tl-track]') as HTMLElement | null;
+    if (!track) return;
+    e.preventDefault();
+    const dayPx = track.getBoundingClientRect().width / totalDays;
+    dragInfo.current = { seg, segKey, startX: e.clientX, startY: e.clientY, dayPx, moved: false };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onSegMove = (e: React.PointerEvent) => {
+    const di = dragInfo.current; if (!di) return;
+    const dx = e.clientX - di.startX, dy = e.clientY - di.startY;
+    if (!di.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+    di.moved = true;
+    const deltaDays = Math.round(dx / di.dayPx);
+    let targetCar: string | null = null;
+    if (di.seg.type === 'planned' && showCars) {
+      const el = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest('[data-car-number]') as HTMLElement | null;
+      targetCar = el?.getAttribute('data-car-number') || null;
+    }
+    setDrag({ segKey: di.segKey, dx, dy, deltaDays, targetCar });
+  };
+  const onSegUp = (e: React.PointerEvent, seg: TLSegment) => {
+    const di = dragInfo.current; const d = drag;
+    dragInfo.current = null; setDrag(null);
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    if (!di) return;
+    if (!di.moved) {
+      if (seg.type === 'active' && seg.assignment && onEditAssignment) onEditAssignment(seg.assignment);
+      return;
+    }
+    const deltaDays = d?.deltaDays ?? 0;
+    if (seg.type === 'active' && seg.assignment) {
+      onMoveAssignment?.(seg.assignment, deltaDays);
+    } else if (seg.type === 'planned' && seg.planId) {
+      if (d?.targetCar && d.targetCar !== seg.planCar) onMovePlanToCar?.(seg.planId, d.targetCar);
+      else if (deltaDays !== 0) onMovePlanDate?.(seg.planId, deltaDays);
+    }
+  };
 
   // ── Paieška (Excel stiliaus: datalist + filtravimas pagal pavardę/numerį) ──
   const [q, setQ] = useState('');
@@ -1798,7 +1893,7 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
 
               const segs: TLSegment[] = [];
 
-              const pushSeg = (startDate: string, endDate: string | null, type: 'active' | 'planned', name: string, seed: string, opts?: { open?: boolean; estimated?: boolean; assignment?: CarAssignment }) => {
+              const pushSeg = (startDate: string, endDate: string | null, type: 'active' | 'planned', name: string, seed: string, opts?: { open?: boolean; estimated?: boolean; assignment?: CarAssignment; planId?: string; planCar?: string }) => {
                 const s = parseISO(startDate);
                 const eRaw = endDate ? parseISO(endDate) : monthEnd;
                 if (isAfter(s, monthEnd) || isBefore(eRaw, monthStart)) return;
@@ -1808,7 +1903,7 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
                 if (endIdx < startIdx) return;
                 // Numatoma grįžimo data (estimated) — vairuotojas dirba IKI tos dienos imtinai.
                 const inclusiveEnd = opts?.estimated ? true : !closedInMonth;
-                segs.push({ startIdx, endIdx, inclusiveEnd, type, name, color: type === 'planned' ? '#9C7B36' : timelineColor(seed), from: startDate, to: endDate, open: opts?.open, estimated: opts?.estimated, assignment: opts?.assignment });
+                segs.push({ startIdx, endIdx, inclusiveEnd, type, name, color: type === 'planned' ? '#9C7B36' : timelineColor(seed), from: startDate, to: endDate, open: opts?.open, estimated: opts?.estimated, assignment: opts?.assignment, planId: opts?.planId, planCar: opts?.planCar });
               };
 
               if (driver) {
@@ -1818,7 +1913,7 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
                   pushSeg(a.startDate, a.endDate ?? driver.plannedReturnDate ?? null, 'active', a.carNumber, a.carNumber, { open: a.endDate == null, estimated: est, assignment: a });
                 });
                 plans.filter(p => p.status === 'Suplanuota' && p.incomingDriverId === driver.id)
-                  .forEach(p => pushSeg(p.date, p.newPlannedReturnDate ?? format(addDays(parseISO(p.date), 42), 'yyyy-MM-dd'), 'planned', p.carNumber, p.carNumber));
+                  .forEach(p => pushSeg(p.date, p.newPlannedReturnDate ?? format(addDays(parseISO(p.date), 42), 'yyyy-MM-dd'), 'planned', p.carNumber, p.carNumber, { planId: p.id, planCar: p.carNumber }));
               }
               if (car) {
                 carAssignments.filter(a => a.carNumber === car.number).forEach(a => {
@@ -1827,7 +1922,7 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
                   pushSeg(a.startDate, a.endDate ?? drv?.plannedReturnDate ?? null, 'active', a.driverName, a.driverId, { open: a.endDate == null, estimated: est, assignment: a });
                 });
                 plans.filter(p => p.status === 'Suplanuota' && p.carNumber === car.number)
-                  .forEach(p => pushSeg(p.date, p.newPlannedReturnDate ?? format(addDays(parseISO(p.date), 42), 'yyyy-MM-dd'), 'planned', p.incomingDriverName, p.incomingDriverId));
+                  .forEach(p => pushSeg(p.date, p.newPlannedReturnDate ?? format(addDays(parseISO(p.date), 42), 'yyyy-MM-dd'), 'planned', p.incomingDriverName, p.incomingDriverId, { planId: p.id, planCar: p.carNumber }));
               }
 
               segs.sort((a, b) => a.startIdx - b.startIdx);
@@ -1840,8 +1935,9 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
 
               const d = driver, c = car;
 
+              const isDropTarget = !!drag && !!c && drag.targetCar === c.number;
               return (
-                <div key={(d || c)!.id} className="flex group hover:bg-canvas/60 transition-colors h-16">
+                <div key={(d || c)!.id} data-car-number={c?.number} className={cn("flex group hover:bg-canvas/60 transition-colors h-16", isDropTarget && "bg-gold/15 ring-1 ring-inset ring-gold/50")}>
                   <div className="w-48 shrink-0 px-4 flex items-center gap-2.5 border-r border-hairline">
                     <div className={cn("w-2 h-2 rounded-full shrink-0", d ? (d.status === 'Reise' ? 'bg-blue-400' : 'bg-emerald-400') : 'bg-gold')} />
                     <div className="min-w-0">
@@ -1849,7 +1945,7 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
                       <p className="text-[10px] text-muted truncate">{d ? (d.status === 'Reise' && d.currentCar !== 'Nėra' ? d.currentCar : 'Namuose') : `${c!.type} • ${c!.registration}`}</p>
                     </div>
                   </div>
-                  <div className="flex-1 relative">
+                  <div className="flex-1 relative" data-tl-track>
                     {/* dienų tinklelis */}
                     {days.map((day, i) => (
                       <div key={i} className={cn("absolute top-0 bottom-0 border-r border-hairline/60", isSameDay(day, new Date()) && "bg-gold/10")} style={{ left: pct(i), width: pct(1) }} />
@@ -1863,20 +1959,33 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
                       const isCurrent = seg === currentSeg;
                       const isPast = seg.type === 'active' && !isCurrent;
                       const clickable = seg.type === 'active' && !!onEditAssignment && !!seg.assignment;
+                      const segKey = `${(d || c)!.id}:${idx}`;
+                      const draggable = canDrag(seg);
+                      const isDragging = drag?.segKey === segKey;
+                      // Aktyvų segmentą stumiam horizontaliai snap'inant prie dienų; planą — laisvai (transl).
+                      const activeShiftLeft = isDragging && seg.type === 'active' ? drag!.deltaDays : 0;
+                      const dragStyle: React.CSSProperties = isDragging
+                        ? (seg.type === 'planned' ? { transform: `translate(${drag!.dx}px, ${drag!.dy}px)`, zIndex: 50 } : { zIndex: 50 })
+                        : {};
                       return (
                         <div
                           key={idx}
-                          onClick={clickable ? () => onEditAssignment!(seg.assignment!) : undefined}
+                          onPointerDown={(e) => onSegDown(e, seg, segKey)}
+                          onPointerMove={onSegMove}
+                          onPointerUp={(e) => onSegUp(e, seg)}
                           className={cn(
-                            "absolute rounded-lg flex items-center gap-1 px-2 overflow-hidden shadow-card transition-all",
+                            "absolute rounded-lg flex items-center gap-1 px-2 overflow-hidden shadow-card",
+                            !isDragging && "transition-all",
                             // Atskiros juostos: faktinis viršuje, planuojamas apačioje — kad nepersidengtų
                             planned ? "top-9 h-4 border border-dashed border-white/45" : "top-2 h-7",
                             isCurrent && "ring-2 ring-gold/80",
                             isPast && "opacity-60",
-                            clickable && "cursor-pointer hover:opacity-100 hover:brightness-110",
+                            isDragging && "ring-2 ring-gold shadow-float opacity-95",
+                            draggable ? "cursor-grab active:cursor-grabbing touch-none select-none" : clickable && "cursor-pointer",
+                            !isDragging && draggable && "hover:opacity-100 hover:brightness-110",
                           )}
-                          style={{ left: pct(seg.startIdx), width: `calc(${pct(widthDays)} - 2px)`, background: planned ? '#B08A3C' : seg.color, color: 'white' }}
-                          title={`${seg.name} · nuo ${seg.from}${seg.to ? `${seg.estimated ? ' · numatoma grįžti iki ' : ' iki '}${seg.to}` : ' (pabaiga nenurodyta)'}${planned ? ' · planuojama' : isCurrent ? ' · dabartinis' : ' · istorija'}${clickable ? ' · spausk redaguoti' : ''}`}
+                          style={{ left: `calc(${pct(seg.startIdx + activeShiftLeft)})`, width: `calc(${pct(widthDays)} - 2px)`, background: planned ? '#B08A3C' : seg.color, color: 'white', ...dragStyle }}
+                          title={`${seg.name} · nuo ${seg.from}${seg.to ? `${seg.estimated ? ' · numatoma grįžti iki ' : ' iki '}${seg.to}` : ' (pabaiga nenurodyta)'}${planned ? ' · planuojama' : isCurrent ? ' · dabartinis' : ' · istorija'}${draggable ? (planned ? ' · tempk ant kitos mašinos arba šonus' : ' · tempk pelę / spausk redaguoti') : ''}`}
                         >
                           {planned && <span className="text-[8px] leading-none shrink-0">⟳</span>}
                           <span className="truncate text-[10px] font-semibold leading-none">{seg.name}</span>
