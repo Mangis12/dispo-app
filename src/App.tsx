@@ -3,7 +3,7 @@ import {
   Users, Truck, Home, Calendar, Plus, ArrowRightLeft, ArrowRight,
   AlertCircle, UserPlus, LogOut, LogIn, X, Edit, History,
   CheckCircle2, User, Trash2, ChevronLeft, ChevronRight,
-  LayoutDashboard, Database, Wifi, WifiOff, Bell, Map as MapIcon
+  LayoutDashboard, Database, Wifi, WifiOff, Bell, Map as MapIcon, Menu
 } from 'lucide-react';
 import {
   format, differenceInDays, parseISO, isBefore, isAfter,
@@ -129,6 +129,37 @@ function TabBtn({ active, onClick, icon, label, badge }: { active: boolean; onCl
   );
 }
 
+// ─── Sidebar nav ──────────────────────────────────────────────────────────────
+function NavGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-0.5">
+      <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted/70">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+function NavItem({ active, onClick, icon, label, badge }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; badge?: number }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "group relative w-full flex items-center gap-3 pl-4 pr-3 py-2 rounded-xl text-sm font-medium transition-all",
+        active ? "bg-ink/[0.055] text-ink" : "text-muted hover:text-ink hover:bg-ink/[0.03]"
+      )}
+    >
+      {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-gold" />}
+      <span className={cn("shrink-0 transition-colors", active ? "text-gold" : "text-muted group-hover:text-ink")}>{icon}</span>
+      <span className="flex-1 text-left">{label}</span>
+      {badge != null && badge > 0 && (
+        <span className="text-[10px] font-semibold text-white bg-gold rounded-full px-1.5 min-w-[18px] h-[18px] inline-flex items-center justify-center">
+          {badge > 9 ? '9+' : badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [drivers, setDrivers]           = useState<Driver[]>([]);
@@ -141,6 +172,7 @@ export default function App() {
   const prevSnap = useRef<AllData>({ drivers: [], cars: [], history: [], plans: [], carAssignments: [] });
 
   const [activeTab, setActiveTab]       = useState<Tab>('dashboard');
+  const [sidebarOpen, setSidebarOpen]   = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<string | null>(null);
   const [toast, setToast]               = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -490,58 +522,98 @@ export default function App() {
     );
   }
 
+  const go = (t: Tab) => { setActiveTab(t); setSidebarOpen(false); };
+  const pageMeta: Record<Tab, { title: string; subtitle: string }> = {
+    dashboard:       { title: 'Skydelis',     subtitle: 'Bendra parko ir vairuotojų apžvalga' },
+    planning:        { title: 'Planavimas',   subtitle: 'Keitimų planavimas ir rekomendacijos' },
+    drivers:         { title: 'Vairuotojai',  subtitle: `${drivers.length} vairuotojai · ${reiseDrivers.length} reise, ${namuoseDrivers.length} namuose` },
+    cars:            { title: 'Automobiliai', subtitle: `${cars.length} mašinos parke` },
+    history:         { title: 'Istorija',     subtitle: 'Visų veiksmų žurnalas' },
+    calendar:        { title: 'Kalendorius',  subtitle: 'Keitimai pagal mėnesį' },
+    'auto-grafikas': { title: 'Grafikas',     subtitle: 'Automobilių užimtumo juosta' },
+    trip:            { title: 'Kelionė',      subtitle: 'Maršrutų ir keitimo logistika' },
+  };
+  const meta = pageMeta[activeTab];
+
   return (
-    <div className="min-h-screen bg-canvas text-ink font-sans">
+    <div className="min-h-screen bg-canvas text-ink font-sans flex">
+      {/* Mobiliojo sidebar fonas */}
+      {sidebarOpen && <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 bg-ink/30 backdrop-blur-sm z-40 lg:hidden" />}
 
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-20 bg-canvas/80 backdrop-blur-xl border-b border-hairline">
-        <div className="max-w-screen-2xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          {/* Logo */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            <div className="w-9 h-9 bg-ink rounded-2xl flex items-center justify-center ring-1 ring-gold/30">
-              <Truck className="text-gold-soft w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-[17px] font-display font-medium tracking-tight leading-none">Dispečeris</p>
-              <p className="text-[10px] text-muted tracking-[0.12em] uppercase mt-1">Vestex Transport</p>
-            </div>
+      {/* ── Sidebar ── */}
+      <aside className={cn(
+        "fixed lg:sticky top-0 z-50 lg:z-30 h-screen w-64 shrink-0 flex flex-col bg-canvas border-r border-hairline transition-transform duration-300 lg:translate-x-0",
+        sidebarOpen ? "translate-x-0 shadow-float" : "-translate-x-full"
+      )}>
+        <div className="flex items-center gap-2.5 px-5 h-16 shrink-0">
+          <div className="w-9 h-9 bg-ink rounded-2xl flex items-center justify-center ring-1 ring-gold/30">
+            <Truck className="text-gold-soft w-4 h-4" />
           </div>
-
-          {/* Nav */}
-          <nav className="flex items-center gap-1 overflow-x-auto py-1 flex-1 justify-center">
-            <TabBtn active={activeTab === 'dashboard'}     onClick={() => setActiveTab('dashboard')}     icon={<LayoutDashboard size={15}/>} label="Skydelis" />
-            <TabBtn active={activeTab === 'planning'}      onClick={() => setActiveTab('planning')}      icon={<ArrowRightLeft size={15}/>}  label="Planavimas" badge={urgentCount} />
-            <TabBtn active={activeTab === 'drivers'}       onClick={() => setActiveTab('drivers')}       icon={<Users size={15}/>}           label="Vairuotojai" />
-            <TabBtn active={activeTab === 'cars'}          onClick={() => setActiveTab('cars')}          icon={<Truck size={15}/>}           label="Auto" />
-            <TabBtn active={activeTab === 'history'}       onClick={() => setActiveTab('history')}       icon={<History size={15}/>}         label="Istorija" />
-            <TabBtn active={activeTab === 'calendar'}      onClick={() => setActiveTab('calendar')}      icon={<Calendar size={15}/>}        label="Kalendorius" />
-            <TabBtn active={activeTab === 'auto-grafikas'} onClick={() => setActiveTab('auto-grafikas')} icon={<LayoutDashboard size={15}/>} label="Grafikas" />
-            <TabBtn active={activeTab === 'trip'}          onClick={() => setActiveTab('trip')}          icon={<MapIcon size={15}/>}         label="Kelionė" />
-          </nav>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* DB indicator */}
-            <span className="hidden md:flex items-center gap-1.5 text-[11px] font-medium text-muted px-2.5 py-1.5">
-              <span className={cn("w-1.5 h-1.5 rounded-full", isSupabaseEnabled ? "bg-emerald-400" : "bg-stone-300")} />
-              {isSupabaseEnabled ? 'Supabase' : 'Vietinė'}
-            </span>
-            <button onClick={() => setAddCarOpen(true)} className="flex items-center gap-1.5 bg-surface border border-hairline text-ink px-3 py-1.5 rounded-full text-xs font-medium hover:border-ink/25 transition-all">
-              <Plus size={14}/><span className="hidden sm:inline">Auto</span>
-            </button>
-            <button onClick={() => setAddDriverOpen(true)} className="flex items-center gap-1.5 bg-ink text-white px-3.5 py-1.5 rounded-full text-xs font-medium hover:bg-ink/85 transition-all">
-              <UserPlus size={14}/><span className="hidden sm:inline">Vairuotojas</span>
-            </button>
-            {isSupabaseEnabled && (
-              <button onClick={() => { void supabase?.auth.signOut(); }} title="Atsijungti" className="flex items-center justify-center text-muted hover:text-ink hover:bg-stone-100 p-2 rounded-full transition-all">
-                <LogOut size={15}/>
-              </button>
-            )}
+          <div>
+            <p className="text-[17px] font-display font-medium tracking-tight leading-none">Dispečeris</p>
+            <p className="text-[10px] text-muted tracking-[0.12em] uppercase mt-1">Vestex Transport</p>
           </div>
         </div>
-      </header>
 
-      <main className="max-w-screen-2xl mx-auto px-4 py-6 space-y-8">
+        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
+          <NavGroup label="Apžvalga">
+            <NavItem active={activeTab === 'dashboard'} onClick={() => go('dashboard')} icon={<LayoutDashboard size={17}/>} label="Skydelis" />
+          </NavGroup>
+          <NavGroup label="Operacijos">
+            <NavItem active={activeTab === 'planning'} onClick={() => go('planning')} icon={<ArrowRightLeft size={17}/>} label="Planavimas" badge={urgentCount} />
+            <NavItem active={activeTab === 'calendar'} onClick={() => go('calendar')} icon={<Calendar size={17}/>} label="Kalendorius" />
+            <NavItem active={activeTab === 'auto-grafikas'} onClick={() => go('auto-grafikas')} icon={<LayoutDashboard size={17}/>} label="Grafikas" />
+            <NavItem active={activeTab === 'trip'} onClick={() => go('trip')} icon={<MapIcon size={17}/>} label="Kelionė" />
+          </NavGroup>
+          <NavGroup label="Katalogas">
+            <NavItem active={activeTab === 'drivers'} onClick={() => go('drivers')} icon={<Users size={17}/>} label="Vairuotojai" />
+            <NavItem active={activeTab === 'cars'} onClick={() => go('cars')} icon={<Truck size={17}/>} label="Automobiliai" />
+          </NavGroup>
+          <NavGroup label="Žurnalas">
+            <NavItem active={activeTab === 'history'} onClick={() => go('history')} icon={<History size={17}/>} label="Istorija" />
+          </NavGroup>
+        </nav>
+
+        <div className="px-3 py-3 border-t border-hairline shrink-0">
+          <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-muted">
+            <span className={cn("w-1.5 h-1.5 rounded-full", isSupabaseEnabled ? "bg-emerald-400" : "bg-stone-300")} />
+            {isSupabaseEnabled ? 'Supabase debesis' : 'Vietinė saugykla'}
+          </div>
+          {isSupabaseEnabled && (
+            <button onClick={() => { void supabase?.auth.signOut(); }} className="w-full flex items-center gap-3 pl-4 pr-3 py-2 rounded-xl text-sm font-medium text-muted hover:text-ink hover:bg-ink/[0.03] transition-all">
+              <LogOut size={17}/> Atsijungti
+            </button>
+          )}
+        </div>
+      </aside>
+
+      {/* ── Content column ── */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Topbar */}
+        <header className="sticky top-0 z-20 bg-canvas/80 backdrop-blur-xl border-b border-hairline">
+          <div className="px-4 lg:px-8 h-16 flex items-center gap-4">
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 -ml-2 text-muted hover:text-ink rounded-lg transition-colors"><Menu size={20}/></button>
+            <div className="min-w-0">
+              <h1 className="text-lg lg:text-xl font-display font-medium tracking-tight leading-none truncate">{meta.title}</h1>
+              <p className="text-[11px] text-muted mt-1 hidden sm:block truncate">{meta.subtitle}</p>
+            </div>
+            <div className="flex-1" />
+            <div className="flex items-center gap-2">
+              {(activeTab === 'cars' || activeTab === 'dashboard') && (
+                <button onClick={() => setAddCarOpen(true)} className="flex items-center gap-1.5 bg-surface border border-hairline text-ink px-3.5 py-2 rounded-full text-xs font-medium hover:border-ink/25 transition-all">
+                  <Plus size={14}/><span className="hidden sm:inline">Automobilis</span>
+                </button>
+              )}
+              {(activeTab === 'drivers' || activeTab === 'dashboard' || activeTab === 'planning') && (
+                <button onClick={() => setAddDriverOpen(true)} className="flex items-center gap-1.5 bg-ink text-white px-3.5 py-2 rounded-full text-xs font-medium hover:bg-ink/85 transition-all">
+                  <UserPlus size={14}/><span className="hidden sm:inline">Vairuotojas</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </header>
+
+        <main className="px-4 lg:px-8 py-6 lg:py-8 space-y-8 w-full max-w-[1600px]">
 
         {/* ══════════════════ DASHBOARD ══════════════════ */}
         {activeTab === 'dashboard' && (
@@ -657,7 +729,6 @@ export default function App() {
         {/* ══════════════════ PLANNING ══════════════════ */}
         {activeTab === 'planning' && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-display font-medium tracking-tight">Pakeitimų planavimas</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left: who to replace */}
               <div className="bg-surface rounded-2xl border border-hairline p-6 space-y-5">
@@ -822,8 +893,7 @@ export default function App() {
         {/* ══════════════════ DRIVERS ══════════════════ */}
         {activeTab === 'drivers' && (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <h2 className="text-2xl font-display font-medium tracking-tight">Vairuotojai ({drivers.length})</h2>
+            <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-3">
               <div className="flex flex-wrap gap-2">
                 <select className={cn(selectCls, 'w-auto')} value={driverFilter.companyType} onChange={e => setDriverFilter(p => ({ ...p, companyType: e.target.value as RegistrationType | '' }))}>
                   <option value="">Visos įmonės</option>
@@ -909,8 +979,7 @@ export default function App() {
         {/* ══════════════════ CARS ══════════════════ */}
         {activeTab === 'cars' && (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <h2 className="text-2xl font-display font-medium tracking-tight">Automobilių parkas ({cars.length})</h2>
+            <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-3">
               <div className="flex gap-2 flex-wrap">
                 <select className={cn(selectCls, 'w-auto')} value={carFilter.registration} onChange={e => setCarFilter(p => ({ ...p, registration: e.target.value as RegistrationType | '' }))}>
                   <option value="">Visos registracijos</option>
@@ -981,8 +1050,7 @@ export default function App() {
         {/* ══════════════════ HISTORY ══════════════════ */}
         {activeTab === 'history' && (
           <div className="space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h2 className="text-2xl font-display font-medium tracking-tight">Istorija</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-4">
               <div className="flex items-center gap-3">
                 <div className="flex bg-stone-100 p-1 rounded-xl">
                   {(['upcoming', 'past'] as const).map(m => (
@@ -1070,8 +1138,7 @@ export default function App() {
         {/* ══════════════════ CALENDAR ══════════════════ */}
         {activeTab === 'calendar' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-display font-medium tracking-tight">Keitimų kalendorius</h2>
+            <div className="flex items-center justify-end">
               <MonthNav value={selectedMonth} onChange={setSelectedMonth} />
             </div>
             <div className="bg-surface rounded-2xl border border-hairline overflow-hidden">
@@ -1113,8 +1180,7 @@ export default function App() {
         {/* ══════════════════ AUTO GRAFIKAS ══════════════════ */}
         {activeTab === 'auto-grafikas' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-display font-medium tracking-tight">Automobilių grafikas</h2>
+            <div className="flex items-center justify-end">
               <MonthNav value={selectedMonth} onChange={setSelectedMonth} />
             </div>
             <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} showCars />
@@ -1330,6 +1396,7 @@ export default function App() {
           <button onClick={() => setToast(null)} className="ml-1 opacity-50 hover:opacity-100 transition-opacity"><X size={14}/></button>
         </div>
       )}
+      </div>
     </div>
   );
 }
