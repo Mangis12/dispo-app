@@ -1725,6 +1725,8 @@ type TLSegment = {
   startIdx: number; endIdx: number; inclusiveEnd: boolean;
   type: 'active' | 'planned'; name: string; color: string;
   from: string; to: string | null;
+  open?: boolean;          // tęsiamas reisas (assignment be pabaigos)
+  estimated?: boolean;     // pabaiga = plannedReturnDate (numatoma grįžimo data)
   assignment?: CarAssignment;
 };
 
@@ -1796,7 +1798,7 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
 
               const segs: TLSegment[] = [];
 
-              const pushSeg = (startDate: string, endDate: string | null, type: 'active' | 'planned', name: string, seed: string, assignment?: CarAssignment) => {
+              const pushSeg = (startDate: string, endDate: string | null, type: 'active' | 'planned', name: string, seed: string, opts?: { open?: boolean; estimated?: boolean; assignment?: CarAssignment }) => {
                 const s = parseISO(startDate);
                 const eRaw = endDate ? parseISO(endDate) : monthEnd;
                 if (isAfter(s, monthEnd) || isBefore(eRaw, monthStart)) return;
@@ -1804,16 +1806,26 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
                 const closedInMonth = !!endDate && !isAfter(eRaw, monthEnd) && !isBefore(eRaw, monthStart);
                 const endIdx = isAfter(eRaw, monthEnd) ? totalDays - 1 : differenceInDays(eRaw, monthStart);
                 if (endIdx < startIdx) return;
-                segs.push({ startIdx, endIdx, inclusiveEnd: !closedInMonth, type, name, color: type === 'planned' ? '#9C7B36' : timelineColor(seed), from: startDate, to: endDate, assignment });
+                // Numatoma grįžimo data (estimated) — vairuotojas dirba IKI tos dienos imtinai.
+                const inclusiveEnd = opts?.estimated ? true : !closedInMonth;
+                segs.push({ startIdx, endIdx, inclusiveEnd, type, name, color: type === 'planned' ? '#9C7B36' : timelineColor(seed), from: startDate, to: endDate, open: opts?.open, estimated: opts?.estimated, assignment: opts?.assignment });
               };
 
               if (driver) {
-                carAssignments.filter(a => a.driverId === driver.id).forEach(a => pushSeg(a.startDate, a.endDate, 'active', a.carNumber, a.carNumber, a));
+                carAssignments.filter(a => a.driverId === driver.id).forEach(a => {
+                  // Atviram reisui pabaigą riboja numatoma grįžimo data (plannedReturnDate).
+                  const est = a.endDate == null && !!driver.plannedReturnDate;
+                  pushSeg(a.startDate, a.endDate ?? driver.plannedReturnDate ?? null, 'active', a.carNumber, a.carNumber, { open: a.endDate == null, estimated: est, assignment: a });
+                });
                 plans.filter(p => p.status === 'Suplanuota' && p.incomingDriverId === driver.id)
                   .forEach(p => pushSeg(p.date, p.newPlannedReturnDate ?? format(addDays(parseISO(p.date), 42), 'yyyy-MM-dd'), 'planned', p.carNumber, p.carNumber));
               }
               if (car) {
-                carAssignments.filter(a => a.carNumber === car.number).forEach(a => pushSeg(a.startDate, a.endDate, 'active', a.driverName, a.driverId, a));
+                carAssignments.filter(a => a.carNumber === car.number).forEach(a => {
+                  const drv = drivers.find(d => d.id === a.driverId);
+                  const est = a.endDate == null && !!drv?.plannedReturnDate;
+                  pushSeg(a.startDate, a.endDate ?? drv?.plannedReturnDate ?? null, 'active', a.driverName, a.driverId, { open: a.endDate == null, estimated: est, assignment: a });
+                });
                 plans.filter(p => p.status === 'Suplanuota' && p.carNumber === car.number)
                   .forEach(p => pushSeg(p.date, p.newPlannedReturnDate ?? format(addDays(parseISO(p.date), 42), 'yyyy-MM-dd'), 'planned', p.incomingDriverName, p.incomingDriverId));
               }
@@ -1822,8 +1834,8 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
               const handovers = segs
                 .filter((s, i) => s.type === 'active' && s.startIdx > 0 && segs.some((o, j) => j < i && o.endIdx <= s.startIdx))
                 .map(s => s.startIdx);
-              // Vienas „dabartinis" segmentas eilutėje: atviras (be pabaigos) su vėliausia pradžia.
-              const openActive = segs.filter(s => s.type === 'active' && s.to === null);
+              // Vienas „dabartinis" segmentas eilutėje: tęsiamas reisas su vėliausia pradžia.
+              const openActive = segs.filter(s => s.type === 'active' && s.open);
               const currentSeg = openActive.length ? openActive.reduce((a, b) => (b.startIdx >= a.startIdx ? b : a)) : null;
 
               const d = driver, c = car;
@@ -1864,10 +1876,15 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
                             clickable && "cursor-pointer hover:opacity-100 hover:brightness-110",
                           )}
                           style={{ left: pct(seg.startIdx), width: `calc(${pct(widthDays)} - 2px)`, background: planned ? '#B08A3C' : seg.color, color: 'white' }}
-                          title={`${seg.name} · nuo ${seg.from}${seg.to ? ` iki ${seg.to}` : ' (dabar)'}${planned ? ' · planuojama' : isCurrent ? ' · dabartinis' : ' · istorija'}${clickable ? ' · spausk redaguoti' : ''}`}
+                          title={`${seg.name} · nuo ${seg.from}${seg.to ? `${seg.estimated ? ' · numatoma grįžti iki ' : ' iki '}${seg.to}` : ' (pabaiga nenurodyta)'}${planned ? ' · planuojama' : isCurrent ? ' · dabartinis' : ' · istorija'}${clickable ? ' · spausk redaguoti' : ''}`}
                         >
                           {planned && <span className="text-[8px] leading-none shrink-0">⟳</span>}
                           <span className="truncate text-[10px] font-semibold leading-none">{seg.name}</span>
+                          {seg.to && !planned && widthDays > 4 && (
+                            <span className="ml-auto shrink-0 text-[9px] font-semibold leading-none tabular-nums opacity-90 pl-1">
+                              {seg.estimated ? '~' : ''}{format(parseISO(seg.to), 'MM-dd')}
+                            </span>
+                          )}
                         </div>
                       );
                     })}
