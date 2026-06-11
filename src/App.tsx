@@ -1512,6 +1512,20 @@ function PlanCard({ plan, drivers, cars, plans, onComplete, onDelete, onEdit, ed
   );
 }
 
+// Stabili spalva pagal raktą (vairuotojui ar mašinai) — gretimi segmentai skiriasi.
+const TL_PALETTE = ['#3F6CB0', '#4E9A87', '#B07F39', '#8769A8', '#AF5468', '#5C8A4E', '#3E8090', '#A8693C'];
+function timelineColor(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return TL_PALETTE[h % TL_PALETTE.length];
+}
+
+type TLSegment = {
+  startIdx: number; endIdx: number; inclusiveEnd: boolean;
+  type: 'active' | 'planned'; name: string; color: string;
+  from: string; to: string | null;
+};
+
 function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars }: {
   drivers: Driver[]; cars: Car[]; plans: ReplacementPlan[]; carAssignments: CarAssignment[]; month: Date; showCars?: boolean;
 }) {
@@ -1519,97 +1533,107 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars 
   const monthEnd   = endOfMonth(month);
   const totalDays  = getDaysInMonth(month);
   const days       = eachDayOfInterval({ start: monthStart, end: monthEnd });
-
-  const rows = showCars ? cars : drivers;
+  const pct        = (n: number) => `${(n / totalDays) * 100}%`;
 
   return (
     <div className="bg-surface rounded-2xl border border-hairline overflow-hidden overflow-x-auto">
-      <div className="min-w-[900px]">
+      <div className="min-w-[920px]">
         {/* Header */}
         <div className="flex border-b border-hairline bg-ink text-white">
-          <div className="w-48 shrink-0 px-4 py-3 text-[10px] font-black uppercase tracking-wider">{showCars ? 'Auto' : 'Vairuotojas'}</div>
+          <div className="w-48 shrink-0 px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">{showCars ? 'Auto' : 'Vairuotojas'}</div>
           <div className="flex flex-1">
-            {days.map(d => (
-              <div key={d.toString()} className={cn("flex-1 py-2 text-center border-r border-white/5", isSameDay(d, new Date()) && "bg-blue-500/20")}>
-                <div className="text-[7px] uppercase opacity-50">{format(d, 'EEE', { locale: lt })}</div>
-                <div className="text-[9px] font-bold">{format(d, 'd')}</div>
-              </div>
-            ))}
+            {days.map(d => {
+              const today = isSameDay(d, new Date());
+              const weekend = [0, 6].includes(d.getDay());
+              return (
+                <div key={d.toString()} className={cn("flex-1 py-2 text-center border-r border-white/5", today && "bg-gold/30", weekend && !today && "bg-white/5")}>
+                  <div className="text-[7px] uppercase opacity-50">{format(d, 'EEE', { locale: lt })}</div>
+                  <div className="text-[9px] font-semibold">{format(d, 'd')}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
         {/* Rows */}
-        <div className="divide-y divide-stone-100">
+        <div className="divide-y divide-hairline">
           {(showCars ? cars : drivers).map(item => {
             const driver = !showCars ? item as Driver : null;
             const car    = showCars  ? item as Car    : null;
 
-            const bars: { start: number; end: number; type: 'active' | 'planned'; label: string }[] = [];
+            const segs: TLSegment[] = [];
+
+            const pushSeg = (startDate: string, endDate: string | null, type: 'active' | 'planned', name: string, seed: string) => {
+              const s = parseISO(startDate);
+              const eRaw = endDate ? parseISO(endDate) : monthEnd;
+              if (isAfter(s, monthEnd) || isBefore(eRaw, monthStart)) return;
+              const startIdx = isBefore(s, monthStart) ? 0 : differenceInDays(s, monthStart);
+              // endDate yra perdavimo diena (kitas vairuotojas pradeda) → ribą laikom išskirtine,
+              // nebent segmentas tęsiasi už mėnesio ribų arba neturi pabaigos (atviras).
+              const closedInMonth = !!endDate && !isAfter(eRaw, monthEnd) && !isBefore(eRaw, monthStart);
+              const endIdx = isAfter(eRaw, monthEnd) ? totalDays - 1 : differenceInDays(eRaw, monthStart);
+              if (endIdx < startIdx) return;
+              segs.push({ startIdx, endIdx, inclusiveEnd: !closedInMonth, type, name, color: type === 'planned' ? '#9C7B36' : timelineColor(seed), from: startDate, to: endDate });
+            };
 
             if (driver) {
-              carAssignments.filter(a => a.driverId === driver.id).forEach(a => {
-                const s = parseISO(a.startDate);
-                const e = a.endDate ? parseISO(a.endDate) : (driver.plannedReturnDate ? parseISO(driver.plannedReturnDate) : monthEnd);
-                if (!isAfter(s, monthEnd) && !isBefore(e, monthStart)) {
-                  const si = isBefore(s, monthStart) ? 0 : differenceInDays(s, monthStart);
-                  const ei = isAfter(e, monthEnd) ? totalDays - 1 : differenceInDays(e, monthStart);
-                  if (ei >= si) bars.push({ start: si, end: ei, type: 'active', label: `${a.carNumber} (${a.startDate})` });
-                }
-              });
-              plans.filter(p => p.status === 'Suplanuota' && p.incomingDriverId === driver.id).forEach(p => {
-                const s = parseISO(p.date);
-                const e = p.newPlannedReturnDate ? parseISO(p.newPlannedReturnDate) : addDays(s, 42);
-                if (!isAfter(s, monthEnd) && !isBefore(e, monthStart)) {
-                  const si = isBefore(s, monthStart) ? 0 : differenceInDays(s, monthStart);
-                  const ei = isAfter(e, monthEnd) ? totalDays - 1 : differenceInDays(e, monthStart);
-                  if (ei >= si) bars.push({ start: si, end: ei, type: 'planned', label: `Planas: ${p.carNumber}` });
-                }
-              });
+              carAssignments.filter(a => a.driverId === driver.id).forEach(a => pushSeg(a.startDate, a.endDate, 'active', a.carNumber, a.carNumber));
+              plans.filter(p => p.status === 'Suplanuota' && p.incomingDriverId === driver.id)
+                .forEach(p => pushSeg(p.date, p.newPlannedReturnDate ?? format(addDays(parseISO(p.date), 42), 'yyyy-MM-dd'), 'planned', p.carNumber, p.carNumber));
             }
-
             if (car) {
-              carAssignments.filter(a => a.carNumber === car.number).forEach(a => {
-                const s = parseISO(a.startDate);
-                const e = a.endDate ? parseISO(a.endDate) : monthEnd;
-                if (!isAfter(s, monthEnd) && !isBefore(e, monthStart)) {
-                  const si = isBefore(s, monthStart) ? 0 : differenceInDays(s, monthStart);
-                  const ei = isAfter(e, monthEnd) ? totalDays - 1 : differenceInDays(e, monthStart);
-                  if (ei >= si) bars.push({ start: si, end: ei, type: 'active', label: a.driverName });
-                }
-              });
-              plans.filter(p => p.status === 'Suplanuota' && p.carNumber === car.number).forEach(p => {
-                const s = parseISO(p.date);
-                const e = p.newPlannedReturnDate ? parseISO(p.newPlannedReturnDate) : addDays(s, 42);
-                if (!isAfter(s, monthEnd) && !isBefore(e, monthStart)) {
-                  const si = isBefore(s, monthStart) ? 0 : differenceInDays(s, monthStart);
-                  const ei = isAfter(e, monthEnd) ? totalDays - 1 : differenceInDays(e, monthStart);
-                  if (ei >= si) bars.push({ start: si, end: ei, type: 'planned', label: p.incomingDriverName });
-                }
-              });
+              carAssignments.filter(a => a.carNumber === car.number).forEach(a => pushSeg(a.startDate, a.endDate, 'active', a.driverName, a.driverId));
+              plans.filter(p => p.status === 'Suplanuota' && p.carNumber === car.number)
+                .forEach(p => pushSeg(p.date, p.newPlannedReturnDate ?? format(addDays(parseISO(p.date), 42), 'yyyy-MM-dd'), 'planned', p.incomingDriverName, p.incomingDriverId));
             }
 
-            const d = driver;
-            const c = car;
+            segs.sort((a, b) => a.startIdx - b.startIdx);
+            // Perdavimo taškai: aktyvaus segmento pradžia, kai prieš tai jau buvo kitas segmentas.
+            const handovers = segs
+              .filter((s, i) => s.type === 'active' && s.startIdx > 0 && segs.some((o, j) => j < i && o.endIdx <= s.startIdx))
+              .map(s => s.startIdx);
+
+            const d = driver, c = car;
 
             return (
-              <div key={(d || c)!.id} className="flex group hover:bg-canvas transition-colors h-12">
-                <div className="w-48 shrink-0 px-4 flex items-center gap-2 border-r border-hairline">
-                  <div className={cn("w-2 h-2 rounded-full shrink-0", d ? (d.status === 'Reise' ? 'bg-blue-500' : 'bg-emerald-500') : 'bg-violet-500')} />
+              <div key={(d || c)!.id} className="flex group hover:bg-canvas/60 transition-colors h-14">
+                <div className="w-48 shrink-0 px-4 flex items-center gap-2.5 border-r border-hairline">
+                  <div className={cn("w-2 h-2 rounded-full shrink-0", d ? (d.status === 'Reise' ? 'bg-blue-400' : 'bg-emerald-400') : 'bg-gold')} />
                   <div className="min-w-0">
-                    <p className="text-xs font-bold truncate">{d ? d.name : c!.number}</p>
-                    <p className="text-[9px] text-stone-400 truncate">{d ? (d.currentCar !== 'Nėra' ? d.currentCar : 'Namuose') : `${c!.type} • ${c!.registration}`}</p>
+                    <p className="text-xs font-semibold truncate">{d ? d.name : c!.number}</p>
+                    <p className="text-[10px] text-muted truncate">{d ? (d.currentCar !== 'Nėra' ? d.currentCar : 'Namuose') : `${c!.type} • ${c!.registration}`}</p>
                   </div>
                 </div>
                 <div className="flex-1 relative">
+                  {/* dienų tinklelis */}
                   {days.map((day, i) => (
-                    <div key={i} className={cn("absolute top-0 bottom-0 border-r border-hairline", isSameDay(day, new Date()) && "bg-blue-50/50")} style={{ left: `${(i / totalDays) * 100}%`, width: `${(1 / totalDays) * 100}%` }} />
+                    <div key={i} className={cn("absolute top-0 bottom-0 border-r border-hairline/60", isSameDay(day, new Date()) && "bg-gold/10")} style={{ left: pct(i), width: pct(1) }} />
                   ))}
-                  {bars.map((bar, idx) => (
-                    <div key={idx} className={cn("absolute top-2 bottom-2 rounded-lg flex items-center px-2 overflow-hidden text-white text-[9px] font-bold", bar.type === 'active' ? 'bg-blue-500' : 'bg-emerald-400 border border-dashed border-emerald-600')}
-                      style={{ left: `${(bar.start / totalDays) * 100}%`, width: `${((bar.end - bar.start + 1) / totalDays) * 100}%` }}
-                      title={bar.label}
-                    >
-                      <span className="truncate">{bar.label}</span>
+
+                  {/* segmentai */}
+                  {segs.map((seg, idx) => {
+                    const widthDays = (seg.endIdx - seg.startIdx) + (seg.inclusiveEnd ? 1 : 0);
+                    if (widthDays <= 0) return null;
+                    const planned = seg.type === 'planned';
+                    return (
+                      <div
+                        key={idx}
+                        className={cn("absolute top-2.5 bottom-2.5 rounded-lg flex items-center px-2 overflow-hidden text-white shadow-card", planned && "border border-dashed border-gold/70")}
+                        style={{ left: pct(seg.startIdx), width: `calc(${pct(widthDays)} - 2px)`, background: planned ? 'transparent' : seg.color, color: planned ? '#9C7B36' : 'white' }}
+                        title={`${seg.name} · nuo ${seg.from}${seg.to ? ` iki ${seg.to}` : ' (dabar)'}${planned ? ' · planuojama' : ''}`}
+                      >
+                        <span className="truncate text-[10px] font-semibold leading-none">{seg.name}</span>
+                      </div>
+                    );
+                  })}
+
+                  {/* perdavimo žymekliai su diena */}
+                  {handovers.map((hi, k) => (
+                    <div key={`h${k}`} className="absolute top-0 bottom-0 z-10 pointer-events-none" style={{ left: pct(hi) }}>
+                      <div className="absolute top-0 bottom-0 w-[2px] -translate-x-1/2 bg-gold" />
+                      <div className="absolute -top-0 left-0 -translate-x-1/2 -translate-y-0 bg-gold text-white text-[8px] font-bold leading-none px-1 py-0.5 rounded-b-md">
+                        {format(addDays(monthStart, hi), 'd')}
+                      </div>
                     </div>
                   ))}
                 </div>
