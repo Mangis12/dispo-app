@@ -18,6 +18,7 @@ import { supabase, isSupabaseEnabled } from './lib/supabase';
 import { loadAll, syncCollection, subscribeAll, type AllData } from './lib/repo';
 import TripPlanner from './components/TripPlanner';
 import CoordinatorBoard from './components/CoordinatorBoard';
+import { RoadHorizonScene, EmptyRoad, EmptyChecklist, SemiTruck } from './components/illustrations';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
   ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment, TaskPoint
@@ -743,6 +744,11 @@ export default function App() {
           </NavGroup>
         </nav>
 
+        {/* Dekoratyvinis line-art akcentas (premium detalė) */}
+        <div className="px-6 pb-1 pt-2 shrink-0 pointer-events-none select-none" aria-hidden>
+          <SemiTruck className="w-full h-auto opacity-[0.18]" />
+        </div>
+
         <div className="px-3 py-3 border-t border-hairline shrink-0">
           <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-muted">
             <span className={cn("w-1.5 h-1.5 rounded-full", isSupabaseEnabled ? "bg-emerald-400" : "bg-stone-300")} />
@@ -787,6 +793,22 @@ export default function App() {
         {/* ══════════════════ DASHBOARD ══════════════════ */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
+            {/* Hero juosta — kinematografinė, premium (Etihad dvasia) */}
+            <div className="relative overflow-hidden rounded-3xl border border-hairline shadow-card h-40 sm:h-44">
+              <RoadHorizonScene className="absolute inset-0 w-full h-full" preserve="xMidYMax slice" />
+              <div className="absolute inset-0 bg-gradient-to-r from-surface/90 via-surface/55 to-transparent" />
+              <div className="relative h-full flex flex-col justify-center px-6 sm:px-9 max-w-xl">
+                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-gold">{format(new Date(), "EEEE, MMMM d", { locale: lt })}</p>
+                <h2 className="font-display text-2xl sm:text-3xl font-medium tracking-tight mt-1">
+                  {(() => { const h = new Date().getHours(); return h < 12 ? 'Labas rytas' : h < 18 ? 'Laba diena' : 'Labas vakaras'; })()}
+                </h2>
+                <p className="text-sm text-muted mt-1.5">
+                  Šiandien <b className="font-semibold text-ink">{reiseDrivers.length}</b> reise · <b className="font-semibold text-ink">{namuoseDrivers.length}</b> namuose
+                  {urgentCount > 0 && <> · <span className="text-red-500 font-semibold">{urgentCount} skubu</span></>}
+                </p>
+              </div>
+            </div>
+
             {/* Stats Row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <StatCard label="Reise"        value={reiseDrivers.length}   sub={`iš ${drivers.length} viso`}          accent="bg-blue-400"    onClick={() => setActiveTab('drivers')} />
@@ -1336,7 +1358,7 @@ export default function App() {
                 </tbody>
               </table>
               {plans.filter(p => historyMode === 'upcoming' ? p.status === 'Suplanuota' : p.status === 'Atlikta').filter(p => isSameMonth(parseISO(p.date), historyMonth)).length === 0 && (
-                <div className="py-12 text-center text-stone-400 text-sm">Planų nerasta</div>
+                <div className="py-12 px-6"><EmptyChecklist label="Planų nerasta šiam laikotarpiui" /></div>
               )}
             </div>
 
@@ -1735,11 +1757,11 @@ function MonthNav({ value, onChange }: { value: Date; onChange: (d: Date) => voi
   );
 }
 
-function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }) {
+function EmptyState({ icon, text, variant = 'road' }: { icon?: React.ReactNode; text: string; variant?: 'road' | 'checklist' }) {
+  void icon;
   return (
-    <div className="py-16 text-center bg-surface rounded-2xl border border-hairline">
-      <div className="inline-flex p-4 bg-canvas rounded-2xl text-stone-300 mb-3">{icon}</div>
-      <p className="text-sm text-muted">{text}</p>
+    <div className="py-14 px-6 text-center bg-surface rounded-2xl border border-hairline">
+      {variant === 'checklist' ? <EmptyChecklist label={text} /> : <EmptyRoad label={text} />}
     </div>
   );
 }
