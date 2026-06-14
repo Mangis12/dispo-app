@@ -18,7 +18,7 @@ import { supabase, isSupabaseEnabled } from './lib/supabase';
 import { loadAll, syncCollection, subscribeAll, type AllData } from './lib/repo';
 import TripPlanner from './components/TripPlanner';
 import CoordinatorBoard from './components/CoordinatorBoard';
-import { RoadHorizonScene, EmptyRoad, EmptyChecklist, SemiTruck } from './components/illustrations';
+import { EmptyRoad, EmptyChecklist, SemiTruck, RouteMark } from './components/illustrations';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
   ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment, TaskPoint
@@ -705,7 +705,7 @@ export default function App() {
   const meta = pageMeta[activeTab];
 
   return (
-    <div className="min-h-screen bg-canvas text-ink font-sans flex">
+    <div className="grain min-h-screen bg-canvas text-ink font-sans flex">
       {/* Mobiliojo sidebar fonas */}
       {sidebarOpen && <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 bg-ink/30 backdrop-blur-sm z-40 lg:hidden" />}
 
@@ -788,23 +788,24 @@ export default function App() {
           </div>
         </header>
 
-        <main className="px-4 lg:px-8 py-6 lg:py-8 space-y-8 w-full max-w-[1600px]">
+        <main key={activeTab} className="reveal px-4 lg:px-8 py-6 lg:py-8 space-y-8 w-full max-w-[1600px]">
 
         {/* ══════════════════ DASHBOARD ══════════════════ */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
-            {/* Hero juosta — kinematografinė, premium (Etihad dvasia) */}
-            <div className="relative overflow-hidden rounded-3xl border border-hairline shadow-card h-40 sm:h-44">
-              <RoadHorizonScene className="absolute inset-0 w-full h-full" preserve="xMidYMax slice" />
-              <div className="absolute inset-0 bg-gradient-to-r from-surface/90 via-surface/55 to-transparent" />
-              <div className="relative h-full flex flex-col justify-center px-6 sm:px-9 max-w-xl">
-                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-gold">{format(new Date(), "EEEE, MMMM d", { locale: lt })}</p>
-                <h2 className="font-display text-2xl sm:text-3xl font-medium tracking-tight mt-1">
+            {/* Hero juosta — reali nuotrauka + Ken Burns, premium (Etihad dvasia) */}
+            <div className="relative overflow-hidden rounded-3xl border border-hairline shadow-card h-44 sm:h-52">
+              <img src="/img/hero-dusk.jpg" alt="" className="absolute inset-0 w-full h-full object-cover kenburns" />
+              <div className="absolute inset-0 bg-gradient-to-r from-ink/80 via-ink/45 to-transparent" />
+              <div className="absolute inset-0 mix-blend-multiply bg-[#9C7B36]/10" />
+              <div className="relative h-full flex flex-col justify-center px-6 sm:px-9 max-w-xl text-white">
+                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-gold-soft drop-shadow">{format(new Date(), "EEEE, MMMM d", { locale: lt })}</p>
+                <h2 className="font-display text-2xl sm:text-3xl font-medium tracking-tight mt-1 drop-shadow-sm">
                   {(() => { const h = new Date().getHours(); return h < 12 ? 'Labas rytas' : h < 18 ? 'Laba diena' : 'Labas vakaras'; })()}
                 </h2>
-                <p className="text-sm text-muted mt-1.5">
-                  Šiandien <b className="font-semibold text-ink">{reiseDrivers.length}</b> reise · <b className="font-semibold text-ink">{namuoseDrivers.length}</b> namuose
-                  {urgentCount > 0 && <> · <span className="text-red-500 font-semibold">{urgentCount} skubu</span></>}
+                <p className="text-sm text-white/85 mt-1.5">
+                  Šiandien <b className="font-semibold text-white">{reiseDrivers.length}</b> reise · <b className="font-semibold text-white">{namuoseDrivers.length}</b> namuose
+                  {urgentCount > 0 && <> · <span className="text-red-300 font-semibold">{urgentCount} skubu</span></>}
                 </p>
               </div>
             </div>
@@ -1442,17 +1443,23 @@ export default function App() {
 
         {/* ══════════════════ KOORDINATORIUS (keitimo taškai) ══════════════════ */}
         {activeTab === 'coordinator' && (
-          <CoordinatorBoard
-            plans={plans} cars={cars} drivers={drivers} taskPoints={taskPoints}
-            onSetPoint={setPlanChangePoint} onClearPoint={clearPlanChangePoint} onSetPlanTask={setPlanChangeTask}
-            onAddTask={addTaskPoint} onUpdateTask={updateTaskPoint} onDeleteTask={deleteTaskPoint} onActivateSaved={activateSavedTask}
-            onGoTrip={() => setActiveTab('trip')}
-          />
+          <div className="space-y-5">
+            <PageBanner img="/img/road-mountain.jpg" eyebrow="Koordinavimas" title="Keitimo taškai ir užduotys" subtitle="Pažymėkite, kur įvyks pamaina — viskas atkeliaus į Kelionę" />
+            <CoordinatorBoard
+              plans={plans} cars={cars} drivers={drivers} taskPoints={taskPoints}
+              onSetPoint={setPlanChangePoint} onClearPoint={clearPlanChangePoint} onSetPlanTask={setPlanChangeTask}
+              onAddTask={addTaskPoint} onUpdateTask={updateTaskPoint} onDeleteTask={deleteTaskPoint} onActivateSaved={activateSavedTask}
+              onGoTrip={() => setActiveTab('trip')}
+            />
+          </div>
         )}
 
         {/* ══════════════════ KELIONĖ (žemėlapis) ══════════════════ */}
         {activeTab === 'trip' && (
-          <TripPlanner drivers={drivers} plans={plans} cars={cars} taskPoints={taskPoints} onConsumeTask={(id) => updateTaskPoint(id, { active: false })} showToast={(msg, type) => setToast({ message: msg, type: type ?? 'success' })} />
+          <div className="space-y-5">
+            <PageBanner img="/img/truck-highway.jpg" eyebrow="Logistika" title="Keitimo kelionės planavimas" subtitle="Maršrutai, sustojimai ir papildomos užduotys viename žemėlapyje" />
+            <TripPlanner drivers={drivers} plans={plans} cars={cars} taskPoints={taskPoints} onConsumeTask={(id) => updateTaskPoint(id, { active: false })} showToast={(msg, type) => setToast({ message: msg, type: type ?? 'success' })} />
+          </div>
         )}
 
         {/* Reset */}
@@ -1753,6 +1760,23 @@ function MonthNav({ value, onChange }: { value: Date; onChange: (d: Date) => voi
       <button onClick={() => onChange(subMonths(value, 1))} className="p-1.5 text-muted hover:text-ink hover:bg-stone-100 rounded-full transition-colors"><ChevronLeft size={14}/></button>
       <span className="px-3 text-xs font-medium min-w-[110px] text-center capitalize">{format(value, 'MMMM yyyy', { locale: lt })}</span>
       <button onClick={() => onChange(addMonths(value, 1))} className="p-1.5 text-muted hover:text-ink hover:bg-stone-100 rounded-full transition-colors"><ChevronRight size={14}/></button>
+    </div>
+  );
+}
+
+// Plona premium nuotraukos juosta skilties viršuje (Etihad dvasia) su route akcentu.
+function PageBanner({ img, eyebrow, title, subtitle }: { img: string; eyebrow: string; title: string; subtitle: string }) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-hairline shadow-card h-28 sm:h-32">
+      <img src={img} alt="" className="absolute inset-0 w-full h-full object-cover kenburns" />
+      <div className="absolute inset-0 bg-gradient-to-r from-ink/85 via-ink/50 to-transparent" />
+      <div className="absolute inset-0 mix-blend-multiply bg-[#9C7B36]/10" />
+      <RouteMark className="absolute right-4 top-1/2 -translate-y-1/2 w-20 h-20 opacity-30 hidden sm:block" stroke="#EDE2C9" />
+      <div className="relative h-full flex flex-col justify-center px-5 sm:px-7 text-white max-w-lg">
+        <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-soft drop-shadow">{eyebrow}</p>
+        <h2 className="font-display text-xl sm:text-2xl font-medium tracking-tight mt-0.5 drop-shadow-sm">{title}</h2>
+        <p className="text-xs text-white/80 mt-1 hidden sm:block">{subtitle}</p>
+      </div>
     </div>
   );
 }

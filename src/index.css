@@ -51,6 +51,40 @@
   .slide-in-from-bottom-4 {
     animation: slideUpSm 0.25s ease-out;
   }
+
+  /* Turinio pasirodymas keičiant skiltį — brangus „reveal" jausmas */
+  .reveal {
+    animation: revealUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .reveal-1 { animation: revealUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both; }
+  .reveal-2 { animation: revealUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both; }
+
+  /* Lėtas „Ken Burns" priartinimas nuotraukoms (kinematografiška) */
+  .kenburns {
+    animation: kenburns 22s ease-out both;
+    will-change: transform;
+  }
+
+  /* Aukso blizgesio perėjimas (shimmer) */
+  .shimmer {
+    background-size: 200% 100%;
+    animation: shimmer 2.4s linear infinite;
+  }
+
+  /* Subtili popieriaus grūdėtumo tekstūra (premium gylis) */
+  .grain::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .reveal-1, .reveal-2, .kenburns, .shimmer { animation: none !important; }
 }
 
 @keyframes fadeIn {
@@ -61,4 +95,19 @@
 @keyframes slideUpSm {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes revealUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes kenburns {
+  from { transform: scale(1.04) translate3d(0, 0, 0); }
+  to { transform: scale(1.16) translate3d(-1.5%, -1.5%, 0); }
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
 }
