@@ -18,7 +18,7 @@ import { supabase, isSupabaseEnabled } from './lib/supabase';
 import { loadAll, syncCollection, subscribeAll, type AllData } from './lib/repo';
 import TripPlanner from './components/TripPlanner';
 import CoordinatorBoard from './components/CoordinatorBoard';
-import { EmptyRoad, EmptyChecklist, SemiTruck, RouteMark, EuropeMap, VanSilhouette } from './components/illustrations';
+import { EmptyRoad, EmptyChecklist, SemiTruck, RouteMark, EuropeMap, VanSilhouette, HeroDrive } from './components/illustrations';
 import { VestexLogo, VestexMark } from './components/logo';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
@@ -808,12 +808,11 @@ export default function App() {
         {/* ══════════════════ DASHBOARD ══════════════════ */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
-            {/* Hero juosta — DAF XF nuotrauka pilna (be apkarpymo), premium poster */}
-            <div className="relative overflow-hidden rounded-3xl border border-hairline shadow-card h-48 sm:h-56 bg-gradient-to-r from-surface via-canvas to-[#e3edf6]">
-              {/* DAF XF — visa mašina matoma (object-contain) */}
-              <img src="/img/daf-xf.jpg" alt="DAF XF" className="absolute inset-y-0 right-0 h-full w-auto max-w-[58%] object-contain object-right-bottom" />
-              <div className="absolute inset-0 bg-gradient-to-r from-canvas via-canvas/85 to-transparent" />
-              <VestexMark className="absolute right-5 bottom-4 h-7 w-auto opacity-25" />
+            {/* Hero — fura išvažiuoja keliu tolyn (kinematografinė animacija) */}
+            <div className="relative overflow-hidden rounded-3xl border border-hairline shadow-card h-48 sm:h-56">
+              <HeroDrive className="absolute inset-0" />
+              <div className="absolute inset-0 bg-gradient-to-r from-canvas via-canvas/70 to-transparent" />
+              <VestexMark className="absolute right-5 bottom-4 h-7 w-auto opacity-30" />
               <div className="relative h-full flex flex-col justify-center px-6 sm:px-9 max-w-md">
                 <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-gold">{format(new Date(), "EEEE, MMMM d", { locale: lt })}</p>
                 <h2 className="font-display text-2xl sm:text-3xl font-medium tracking-tight mt-1 text-ink">
@@ -1942,10 +1941,10 @@ function PlanCard({ plan, drivers, cars, plans, onComplete, onDelete, onEdit, ed
           </div>
         </div>
 
-        {/* Keitimas: išvykstantis vairuotojas → (mašina) → atvykstantis */}
-        <div className="flex-1 flex items-center gap-2 sm:gap-3">
+        {/* Keitimo „maršrutas": namo grįžtantis ╌╌🚛╌╌ į reisą einantis */}
+        <div className="flex-1 flex items-center gap-2 sm:gap-3 min-w-0">
           {/* Namo grįžtantis */}
-          <div className="flex-1 flex items-center gap-2 justify-end text-right min-w-0">
+          <div className="flex items-center gap-2.5 justify-end text-right shrink min-w-0 basis-[38%]">
             <div className="min-w-0">
               <p className="text-[8px] text-red-500 font-bold uppercase tracking-wide flex items-center justify-end gap-1"><LogOut size={9}/>Namo</p>
               <p className="font-semibold text-sm truncate">{plan.leavingDriverName}</p>
@@ -1954,16 +1953,20 @@ function PlanCard({ plan, drivers, cars, plans, onComplete, onDelete, onEdit, ed
             <div className="w-9 h-9 rounded-full bg-red-50 text-red-500 flex items-center justify-center text-[11px] font-bold shrink-0">{initials(plan.leavingDriverName)}</div>
           </div>
 
-          {/* Maršruto jungtis su mašina */}
-          <div className="relative flex flex-col items-center shrink-0 px-1">
-            <div className="absolute top-1/2 -translate-y-1/2 w-full border-t border-dashed border-hairline" />
-            <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-ink to-[#3a3122] text-gold-soft flex items-center justify-center shadow-card">
-              <SemiTruck className="w-6 h-auto" stroke="currentColor" />
+          {/* Kelias su važiuojančia mašina (užpildo tarpą prasmingai) */}
+          <div className="relative flex-1 h-9 min-w-[48px] flex items-center">
+            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t-2 border-dotted border-hairline" />
+            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-red-400 ring-2 ring-red-100" />
+            <span className="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-100" />
+            <div className="plan-truck absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-ink to-[#3a3122] text-gold-soft flex items-center justify-center shadow-card ring-1 ring-gold/20">
+                <SemiTruck className="w-6 h-auto" stroke="currentColor" />
+              </div>
             </div>
           </div>
 
           {/* Į reisą einantis (paryškintas — pakeitėjas) */}
-          <div className="flex-1 flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2.5 shrink min-w-0 basis-[38%]">
             <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[11px] font-bold shrink-0 ring-2 ring-emerald-200">{initials(plan.incomingDriverName)}</div>
             <div className="min-w-0">
               <p className="text-[8px] text-emerald-600 font-bold uppercase tracking-wide flex items-center gap-1"><LogIn size={9}/>Į reisą</p>

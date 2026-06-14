@@ -145,6 +145,39 @@
   50% { opacity: 0.6; }
 }
 
+/* „Fura išvažiuoja keliu tolyn" — kinematografinė hero animacija */
+.drive-away {
+  animation: driveAway 7.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  will-change: transform, opacity;
+}
+.roadside-a { animation: roadside 7.5s linear infinite; }
+.roadside-b { animation: roadside 7.5s linear infinite 2.5s; }
+.roadside-c { animation: roadside 7.5s linear infinite 5s; }
+.road-dash { animation: dashFlow 1.1s linear infinite; }
+.plan-truck { animation: planDrive 4.5s ease-in-out infinite; }
+
+@keyframes driveAway {
+  0%   { transform: translate3d(-24%, 30%, 0) scale(1.18); opacity: 0; }
+  10%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translate3d(64%, -16%, 0) scale(0.24); opacity: 0; }
+}
+@keyframes roadside {
+  0%   { transform: translate3d(58%, -14%, 0) scale(0.2); opacity: 0; }
+  12%  { opacity: 0.55; }
+  85%  { opacity: 0.55; }
+  100% { transform: translate3d(-30%, 34%, 0) scale(1.5); opacity: 0; }
+}
+@keyframes dashFlow {
+  to { stroke-dashoffset: -22; }
+}
+@keyframes planDrive {
+  0%, 100% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .map-pin, .map-ring, .map-arc { animation: none !important; stroke-dashoffset: 0 !important; opacity: 1 !important; }
+  .drive-away, .roadside-a, .roadside-b, .roadside-c, .road-dash, .plan-truck { animation: none !important; }
+  .drive-away { opacity: 1 !important; transform: translate3d(20%, 6%, 0) scale(0.7) !important; }
 }

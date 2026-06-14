@@ -224,6 +224,67 @@ export function SprinterVan({ className, stroke = GOLD, style }: { className?: s
   );
 }
 
+// ── HERO: fura išvažiuoja keliu tolyn (kinematografinė animacija, Etihad dvasia) ──
+// Perspektyvinis kelias su nykimo tašku, saulė ties horizontu, judantys kelkraščio
+// stulpai (greičio pojūtis) ir vilkikas, važiuojantis tolyn (mažėja + nyksta).
+export function HeroDrive({ className }: { className?: string }) {
+  return (
+    <div className={className} aria-hidden>
+      {/* Statiškas fonas: dangus, saulė, kelias */}
+      <svg viewBox="0 0 1100 300" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 w-full h-full">
+        <defs>
+          <linearGradient id="hd-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#F6EEDC" />
+            <stop offset="0.55" stopColor="#F1E7D3" />
+            <stop offset="1" stopColor="#E9DcC2" />
+          </linearGradient>
+          <radialGradient id="hd-sun" cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stopColor="#D8B36A" stopOpacity="0.7" />
+            <stop offset="0.55" stopColor="#D8B36A" stopOpacity="0.18" />
+            <stop offset="1" stopColor="#D8B36A" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="hd-road" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#2c2519" stopOpacity="0.02" />
+            <stop offset="1" stopColor="#2c2519" stopOpacity="0.14" />
+          </linearGradient>
+        </defs>
+        <rect width="1100" height="300" fill="url(#hd-sky)" />
+        {/* Šiltas horizonto ruožas */}
+        <rect x="0" y="120" width="1100" height="48" fill="#E6C588" opacity="0.18" />
+        <circle cx="772" cy="134" r="170" fill="url(#hd-sun)" />
+        <circle cx="772" cy="134" r="42" fill="none" stroke="#C9A24E" strokeWidth="1.2" opacity="0.55" />
+        {/* Tolima medžių linija */}
+        <path d="M0 166 q 40 -14 70 0 q 36 -18 72 0 q 44 -12 80 0 q 40 -16 78 0 q 50 -10 90 2 l560 0 q 44 -14 80 0 V 300 H 0 Z" fill="#5C6B3E" fillOpacity="0.08" />
+        {/* Tolimos kalvos */}
+        <path d="M0 172 Q 300 156 600 168 T 1100 162 V 300 H 0 Z" fill="#9C7B36" fillOpacity="0.06" />
+        {/* Kelias (perspektyva į nykimo tašką) */}
+        <path d="M230 300 L758 140 L786 140 L1010 300 Z" fill="url(#hd-road)" />
+        <path d="M758 140 L230 300 M786 140 L1010 300" stroke="#9C7B36" strokeWidth="1.5" opacity="0.45" />
+        {/* Vidurio brūkšninė (juda link žiūrovo) */}
+        <path className="road-dash" d="M772 150 L640 300" stroke="#C9A24E" strokeWidth="3.5" opacity="0.55"
+          strokeDasharray="7 15" strokeLinecap="round" />
+        {/* Statiški pakelės medžiai (gylis) */}
+        <g fill="#5C6B3E" fillOpacity="0.16">
+          <path d="M205 152 l7 0 -1 14 -5 0 z" /><circle cx="208" cy="148" r="9" />
+          <path d="M150 158 l8 0 -1 18 -6 0 z" /><circle cx="154" cy="152" r="12" />
+        </g>
+      </svg>
+
+      {/* Judantys kelkraščio stulpai — greičio pojūtis */}
+      {['roadside-a', 'roadside-b', 'roadside-c'].map((c) => (
+        <div key={c} className={`absolute ${c}`} style={{ left: '69%', top: '44%', width: '2.2%' }}>
+          <svg viewBox="0 0 20 60" className="w-full h-auto"><path d="M10 60 V10" stroke="#9C7B36" strokeWidth="3" strokeLinecap="round" /><circle cx="10" cy="8" r="5" fill="#C9A24E" /></svg>
+        </div>
+      ))}
+
+      {/* Vilkikas išvažiuoja tolyn */}
+      <div className="absolute drive-away" style={{ left: '34%', bottom: '12%', width: '23%' }}>
+        <SemiTruck className="w-full h-auto" stroke="#3a3122" />
+      </div>
+    </div>
+  );
+}
+
 // ── Furgono SILUETAS (užpildytas) — Mercedes Sprinter tipo (aukštas kėbulas) ──
 export function VanSilhouette({ className, fill = GOLD, style }: { className?: string; fill?: string; style?: CSSProperties }) {
   return (
