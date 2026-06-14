@@ -4,7 +4,7 @@ import {
   AlertCircle, UserPlus, LogOut, LogIn, X, Edit, History,
   CheckCircle2, User, Trash2, ChevronLeft, ChevronRight,
   LayoutDashboard, Database, Wifi, WifiOff, Bell, Map as MapIcon, MapPin, Menu, Search, Mail, Undo2, StickyNote,
-  List, LayoutGrid, Columns3, Download, Phone
+  List, LayoutGrid, Columns3, Download, Phone, Snowflake, Container
 } from 'lucide-react';
 import {
   format, differenceInDays, parseISO, isBefore, isAfter,
@@ -225,6 +225,10 @@ export default function App() {
   const [driverView, setDriverView]           = useState<'table' | 'kanban' | 'cards'>('table');
   const [profileDriver, setProfileDriver]     = useState<Driver | null>(null);
   const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
+  // Automobilių „duomenų bazė"
+  const [carView, setCarView]                 = useState<'table' | 'kanban' | 'cards'>('cards');
+  const [profileCar, setProfileCar]           = useState<Car | null>(null);
+  const [selectedCarIds, setSelectedCarIds]   = useState<string[]>([]);
 
   // History tab
   const [historyMode, setHistoryMode]         = useState<'upcoming' | 'past'>('upcoming');
@@ -643,6 +647,25 @@ export default function App() {
     const lines = list.map(d => `• ${d.name} (${d.companyType}·${d.specialization}) — ${d.status}${d.status === 'Reise' ? ` · ${d.currentCar} · grįžta ${d.plannedReturnDate || '?'}` : ` · laisvas nuo ${d.readinessDate || '?'}`} · ${d.phone}`).join('\n');
     const body = `Sveiki,\n\nVairuotojų sąrašas (${list.length}):\n\n${lines}\n\n— Dispečeris · Vestex Transport`;
     window.location.href = `mailto:?subject=${encodeURIComponent(`Vairuotojų sąrašas (${list.length})`)}&body=${encodeURIComponent(body)}`;
+  };
+
+  // ── Automobilių bazė: CSV eksportas ir el. paštas ──
+  const exportCarsCSV = (list: Car[]) => {
+    if (!list.length) { showToast('Nėra ką eksportuoti', 'error'); return; }
+    const head = ['Numeris', 'Tipas', 'Registracija', 'Būsena', 'Vairuotojas'];
+    const rows = list.map(c => { const drv = drivers.find(d => d.currentCar === c.number); return [c.number, c.type, c.registration, c.status, drv?.name || '']; });
+    const csv = [head, ...rows].map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `automobiliai_${format(new Date(), 'yyyy-MM-dd')}.csv`; a.click();
+    URL.revokeObjectURL(url);
+    showToast(`Eksportuota: ${list.length} mašinų`);
+  };
+  const emailCars = (list: Car[]) => {
+    if (!list.length) { showToast('Pažymėkite mašinų', 'error'); return; }
+    const lines = list.map(c => { const drv = drivers.find(d => d.currentCar === c.number); return `• ${c.number} (${c.type}·${c.registration}) — ${c.status}${drv ? ` · vairuotojas: ${drv.name}` : ' · laisva'}`; }).join('\n');
+    const body = `Sveiki,\n\nAutomobilių sąrašas (${list.length}):\n\n${lines}\n\n— Dispečeris · Vestex Transport`;
+    window.location.href = `mailto:?subject=${encodeURIComponent(`Automobilių sąrašas (${list.length})`)}&body=${encodeURIComponent(body)}`;
   };
 
   // ── El. laiško su savaitės planais turinys (mailto) ──
@@ -1359,75 +1382,166 @@ export default function App() {
         })()}
 
         {/* ══════════════════ CARS ══════════════════ */}
-        {activeTab === 'cars' && (
+        {activeTab === 'cars' && (() => {
+          const fc = cars.filter(c => {
+            const mr = !carFilter.registration || c.registration === carFilter.registration;
+            const mt = !carFilter.type || c.type === carFilter.type;
+            const ms = !carFilter.search || c.number.toLowerCase().includes(carFilter.search.toLowerCase());
+            return mr && mt && ms;
+          });
+          const tentai = fc.filter(c => c.type === 'Tentas');
+          const refai = fc.filter(c => c.type === 'Refas');
+          const selectedList = fc.filter(c => selectedCarIds.includes(c.id));
+          const allSel = fc.length > 0 && fc.every(c => selectedCarIds.includes(c.id));
+          const toggleSel = (id: string) => setSelectedCarIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+          const TypeIcon = ({ t, className }: { t: CarType; className?: string }) => t === 'Refas' ? <Snowflake className={className} /> : <Container className={className} />;
+          const carCard = (car: Car) => {
+            const driver = drivers.find(d => d.currentCar === car.number);
+            const plan = plans.find(p => p.status === 'Suplanuota' && p.carNumber === car.number);
+            const sel = selectedCarIds.includes(car.id);
+            return (
+              <div key={car.id} onClick={() => setProfileCar(car)} className={cn("group bg-surface rounded-2xl border p-4 cursor-pointer transition-all hover:shadow-card hover:border-ink/20", sel ? "border-gold ring-1 ring-gold/30" : "border-hairline")}>
+                <div className="flex items-start gap-3">
+                  <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center shrink-0", car.status === 'Aktyvus' ? "bg-ink text-gold-soft" : "bg-red-50 text-red-400")}>
+                    <TypeIcon t={car.type} className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-mono font-bold text-base tracking-tight">{car.number}</p>
+                    <div className="flex gap-1.5 mt-1 flex-wrap">
+                      <Badge variant="blue">{car.type}</Badge>
+                      <Badge>{car.registration}</Badge>
+                      <Badge variant={car.status === 'Aktyvus' ? 'green' : 'red'}>{car.status}</Badge>
+                    </div>
+                  </div>
+                  <input type="checkbox" onClick={e => e.stopPropagation()} checked={sel} onChange={() => toggleSel(car.id)} className="accent-gold mt-0.5 w-4 h-4" />
+                </div>
+
+                <div className="flex items-center gap-2 text-sm border-t border-hairline mt-3 pt-3">
+                  {driver ? <>
+                    <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-semibold shrink-0">{driver.name.split(' ').map(w => w[0]).slice(0, 2).join('')}</div>
+                    <div className="min-w-0"><p className="font-semibold text-xs truncate">{driver.name}</p><p className="text-[10px] text-muted">Grįžta {driver.plannedReturnDate || '?'}</p></div>
+                  </> : <>
+                    <div className="w-7 h-7 rounded-full bg-stone-100 flex items-center justify-center shrink-0"><User size={13} className="text-stone-400" /></div>
+                    <p className="text-stone-400 italic text-xs">Laisva</p>
+                  </>}
+                  {plan && <span className="ml-auto text-[9px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full shrink-0">PLANAS {format(parseISO(plan.date), 'MM.dd')}</span>}
+                </div>
+
+                {!driver && (
+                  <button onClick={e => { e.stopPropagation(); setSelectedCarForAssignment(car.number); setTripOpen(true); }} className="w-full bg-ink text-white py-2 rounded-xl text-xs font-bold hover:bg-ink/85 transition-colors mt-3">Priskirti vairuotoją</button>
+                )}
+              </div>
+            );
+          };
+          return (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-3">
-              <div className="flex gap-2 flex-wrap">
+            {/* Įrankių juosta */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div className="flex bg-ink/[0.06] p-1 rounded-xl self-start">
+                {([['cards', 'Kortelės', LayoutGrid], ['kanban', 'Pagal tipą', Columns3], ['table', 'Lentelė', List]] as const).map(([v, label, Icon]) => (
+                  <button key={v} onClick={() => setCarView(v)} className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all', carView === v ? 'bg-surface shadow-card text-ink' : 'text-muted hover:text-ink')}>
+                    <Icon size={14} /> {label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {selectedCarIds.length > 0 && (
+                  <div className="flex items-center gap-1.5 mr-1">
+                    <span className="text-xs font-semibold text-ink bg-gold/15 px-2.5 py-1.5 rounded-lg">{selectedList.length} pasirinkta</span>
+                    <button onClick={() => emailCars(selectedList)} title="Siųsti el. paštu" className="p-2 rounded-lg bg-ink/[0.06] hover:bg-ink hover:text-white transition-all"><Mail size={14} /></button>
+                    <button onClick={() => exportCarsCSV(selectedList)} title="Eksportuoti CSV" className="p-2 rounded-lg bg-ink/[0.06] hover:bg-ink hover:text-white transition-all"><Download size={14} /></button>
+                    <button onClick={() => setSelectedCarIds([])} title="Išvalyti" className="p-2 rounded-lg text-muted hover:text-red-500 transition-colors"><X size={14} /></button>
+                  </div>
+                )}
                 <select className={cn(selectCls, 'w-auto')} value={carFilter.registration} onChange={e => setCarFilter(p => ({ ...p, registration: e.target.value as RegistrationType | '' }))}>
-                  <option value="">Visos registracijos</option>
-                  <option value="LT">LT</option>
-                  <option value="PL">PL</option>
+                  <option value="">Visos registracijos</option><option value="LT">LT</option><option value="PL">PL</option>
                 </select>
                 <select className={cn(selectCls, 'w-auto')} value={carFilter.type} onChange={e => setCarFilter(p => ({ ...p, type: e.target.value as CarType | '' }))}>
-                  <option value="">Visi tipai</option>
-                  <option value="Tentas">Tentas</option>
-                  <option value="Refas">Refas</option>
+                  <option value="">Visi tipai</option><option value="Tentas">Tentas</option><option value="Refas">Refas</option>
                 </select>
                 <input placeholder="Paieška..." className={cn(inputCls, 'w-32')} value={carFilter.search} onChange={e => setCarFilter(p => ({ ...p, search: e.target.value }))} />
+                <button onClick={() => exportCarsCSV(fc)} title="Eksportuoti visus į CSV" className="p-2 rounded-lg border border-hairline text-muted hover:text-ink hover:border-ink/30 transition-all"><Download size={15} /></button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {cars.filter(c => {
-                const mr = !carFilter.registration || c.registration === carFilter.registration;
-                const mt = !carFilter.type || c.type === carFilter.type;
-                const ms = !carFilter.search || c.number.toLowerCase().includes(carFilter.search.toLowerCase());
-                return mr && mt && ms;
-              }).map(car => {
-                const driver = drivers.find(d => d.currentCar === car.number);
-                const plan   = plans.find(p => p.status === 'Suplanuota' && p.carNumber === car.number);
-                return (
-                  <div key={car.id} className="bg-surface rounded-2xl border border-hairline p-5 flex flex-col gap-4 hover:shadow-md transition-shadow group">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-mono font-black text-lg tracking-tight">{car.number}</p>
-                        <div className="flex gap-1.5 mt-1">
-                          <Badge variant="blue">{car.type}</Badge>
-                          <Badge>{car.registration}</Badge>
-                          <Badge variant={car.status === 'Aktyvus' ? 'green' : 'red'}>{car.status}</Badge>
-                        </div>
-                      </div>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => { setSelectedCarForEdit(car); setEditCarOpen(true); }} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"><Edit size={13}/></button>
-                        <button onClick={() => deleteCar(car.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={13}/></button>
-                      </div>
+            {/* KORTELĖS */}
+            {carView === 'cards' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {fc.map(carCard)}
+                {fc.length === 0 && <div className="col-span-full text-center text-muted py-10 text-sm">Nieko nerasta</div>}
+              </div>
+            )}
+
+            {/* PAGAL TIPĄ (kanban) */}
+            {carView === 'kanban' && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {([['Tentai', tentai, 'bg-blue-400'], ['Refai', refai, 'bg-cyan-400']] as const).map(([title, list, dot]) => (
+                  <div key={title} className="bg-canvas/40 rounded-2xl border border-hairline p-3">
+                    <div className="flex items-center gap-2 px-2 py-1.5 mb-2">
+                      <span className={cn('w-2 h-2 rounded-full', dot)} />
+                      <p className="text-sm font-semibold">{title}</p>
+                      <span className="text-xs text-muted">· {list.length}</span>
                     </div>
-
-                    <div className="flex items-center gap-2 text-sm border-t border-hairline pt-3">
-                      <div className="w-6 h-6 rounded-full bg-stone-100 flex items-center justify-center shrink-0">
-                        <User size={12} className="text-stone-400"/>
-                      </div>
-                      {driver ? <p className="font-semibold">{driver.name}</p> : <p className="text-stone-400 italic text-xs">Nepriskirtas</p>}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {list.map(carCard)}
+                      {list.length === 0 && <p className="text-xs text-muted text-center py-8 sm:col-span-2">Tuščia</p>}
                     </div>
-
-                    {plan && (
-                      <div className="bg-violet-50 border border-violet-100 rounded-xl p-3">
-                        <p className="text-[9px] font-black text-violet-500 uppercase mb-1">Suplanuotas keitimas</p>
-                        <p className="text-xs font-semibold">{plan.incomingDriverName} → {plan.date}</p>
-                      </div>
-                    )}
-
-                    {!driver && (
-                      <button onClick={() => { setSelectedCarForAssignment(car.number); setTripOpen(true); }} className="w-full bg-ink text-white py-2 rounded-xl text-xs font-bold hover:bg-ink/85 transition-colors">
-                        Priskirti vairuotoją
-                      </button>
-                    )}
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
+
+            {/* LENTELĖ */}
+            {carView === 'table' && (
+              <div className="bg-surface rounded-2xl border border-hairline overflow-hidden overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-ink text-white text-left">
+                      <th className="pl-4 pr-2 py-3 w-9"><input type="checkbox" checked={allSel} onChange={() => setSelectedCarIds(allSel ? [] : fc.map(c => c.id))} className="accent-gold w-4 h-4 align-middle" /></th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Mašina</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Reg.</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Būsena</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Vairuotojas</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Keitimas</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold text-right">Veiksmai</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100">
+                    {fc.map(car => {
+                      const driver = drivers.find(d => d.currentCar === car.number);
+                      const plan = plans.find(p => p.status === 'Suplanuota' && p.carNumber === car.number);
+                      const sel = selectedCarIds.includes(car.id);
+                      return (
+                        <tr key={car.id} onClick={() => setProfileCar(car)} className={cn("hover:bg-canvas transition-colors cursor-pointer", sel && "bg-gold/[0.05]")}>
+                          <td className="pl-4 pr-2 py-3" onClick={e => e.stopPropagation()}><input type="checkbox" checked={sel} onChange={() => toggleSel(car.id)} className="accent-gold w-4 h-4 align-middle" /></td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", car.status === 'Aktyvus' ? "bg-ink text-gold-soft" : "bg-red-50 text-red-400")}><TypeIcon t={car.type} className="w-4 h-4" /></div>
+                              <div><div className="font-mono font-bold">{car.number}</div><div className="text-[10px] text-muted">{car.type}</div></div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3"><Badge>{car.registration}</Badge></td>
+                          <td className="px-4 py-3"><Badge variant={car.status === 'Aktyvus' ? 'green' : 'red'}>{car.status}</Badge></td>
+                          <td className="px-4 py-3 text-xs">{driver ? <span className="font-semibold">{driver.name}</span> : <span className="text-muted italic">Laisva</span>}</td>
+                          <td className="px-4 py-3 text-xs">{plan ? <span className="text-violet-600 font-semibold">{plan.incomingDriverName} · {format(parseISO(plan.date), 'MM.dd')}</span> : <span className="text-muted">—</span>}</td>
+                          <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-end gap-1.5">
+                              {!driver && <button onClick={() => { setSelectedCarForAssignment(car.number); setTripOpen(true); }} className="px-2.5 py-1 bg-ink text-white text-[10px] font-bold rounded-lg hover:bg-ink/85 transition-colors">Priskirti</button>}
+                              <button onClick={() => { setSelectedCarForEdit(car); setEditCarOpen(true); }} className="p-1.5 bg-ink/[0.05] text-ink hover:bg-ink hover:text-white rounded-lg transition-all"><Edit size={13} /></button>
+                              <button onClick={() => deleteCar(car.id)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Trash2 size={13} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {fc.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-muted text-sm">Nieko nerasta</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
+          );
+        })()}
 
         {/* ══════════════════ HISTORY ══════════════════ */}
         {activeTab === 'history' && (
@@ -1826,6 +1940,16 @@ export default function App() {
         />
       )}
 
+      {/* Automobilio profilio drawer */}
+      {profileCar && (
+        <CarProfileDrawer
+          car={profileCar} drivers={drivers} plans={plans} carAssignments={carAssignments} history={history}
+          onClose={() => setProfileCar(null)}
+          onAssign={(c) => { setProfileCar(null); setSelectedCarForAssignment(c.number); setTripOpen(true); }}
+          onEdit={(c) => { setProfileCar(null); setSelectedCarForEdit(c); setEditCarOpen(true); }}
+        />
+      )}
+
       {/* Confirm Plan */}
       {confirmData && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in">
@@ -2093,6 +2217,112 @@ function DriverProfileDrawer({ driver, plans, carAssignments, history, onClose, 
                       <span className="font-semibold">{h.action}</span>
                       {h.details && <p className="text-muted truncate">{h.details}</p>}
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Automobilio profilio šoninė panelė: dabartinis vairuotojas, priskyrimų
+// istorija, susiję planai, žurnalas + greiti veiksmai.
+function CarProfileDrawer({ car, drivers, plans, carAssignments, history, onClose, onAssign, onEdit }: {
+  car: Car; drivers: Driver[]; plans: ReplacementPlan[]; carAssignments: CarAssignment[]; history: HistoryEntry[];
+  onClose: () => void; onAssign: (c: Car) => void; onEdit: (c: Car) => void;
+}) {
+  const driver = drivers.find(d => d.currentCar === car.number);
+  const relPlans = plans.filter(p => p.carNumber === car.number).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
+  const assigns = carAssignments.filter(a => a.carNumber === car.number).sort((a, b) => b.startDate.localeCompare(a.startDate)).slice(0, 8);
+  const log = history.filter(h => h.carNumber === car.number).slice(0, 10);
+  const Row = ({ k, v }: { k: string; v: React.ReactNode }) => (
+    <div className="flex items-center justify-between gap-3 py-1.5"><span className="text-xs text-muted">{k}</span><span className="text-sm font-medium text-right">{v}</span></div>
+  );
+  return (
+    <div className="fixed inset-0 z-[70]">
+      <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm animate-in fade-in" onClick={onClose} />
+      <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-canvas shadow-float flex flex-col slide-in-from-bottom-4">
+        <div className="bg-ink text-white p-6 shrink-0">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center ring-1", car.status === 'Aktyvus' ? "bg-gold/15 text-gold-soft ring-gold/30" : "bg-red-500/20 text-red-200 ring-red-400/30")}>
+                {car.type === 'Refas' ? <Snowflake size={24} /> : <Container size={24} />}
+              </div>
+              <div>
+                <p className="font-display text-xl font-medium leading-tight font-mono">{car.number}</p>
+                <p className="text-xs text-white/70 mt-1">{car.type} · {car.registration}</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg"><X size={18} /></button>
+          </div>
+          <div className="flex items-center gap-2 mt-4">
+            <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", car.status === 'Aktyvus' ? "bg-emerald-400/20 text-emerald-100" : "bg-red-500/25 text-red-100")}><span className={cn("w-1.5 h-1.5 rounded-full", car.status === 'Aktyvus' ? "bg-emerald-300" : "bg-red-300")} />{car.status}</span>
+            <span className={cn("rounded-full px-2.5 py-1 text-xs font-medium", driver ? "bg-blue-400/20 text-blue-100" : "bg-white/10")}>{driver ? 'Užimta' : 'Laisva'}</span>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="bg-surface rounded-2xl border border-hairline p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">Dabartinis vairuotojas</p>
+            {driver ? <>
+              <div className="flex items-center gap-3 mt-1">
+                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-semibold shrink-0">{driver.name.split(' ').map(w => w[0]).slice(0, 2).join('')}</div>
+                <div><p className="font-semibold text-sm">{driver.name}</p><p className="text-[11px] text-muted">{driver.companyType} · {driver.specialization}</p></div>
+              </div>
+              <div className="mt-3 pt-3 border-t border-hairline"><Row k="Reiso pradžia" v={driver.startDate || '—'} /><Row k="Numatomas grįžimas" v={driver.plannedReturnDate || '—'} /></div>
+            </> : (
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-sm text-muted italic">Mašina laisva</span>
+                <button onClick={() => onAssign(car)} className="px-3 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-ink/85 transition-colors">Priskirti</button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            {!driver && <button onClick={() => onAssign(car)} className="flex-1 inline-flex items-center justify-center gap-2 bg-ink text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-ink/85 transition-colors"><LogIn size={15} /> Priskirti vairuotoją</button>}
+            <button onClick={() => onEdit(car)} className={cn("inline-flex items-center justify-center gap-2 px-4 bg-ink/[0.05] text-ink rounded-xl text-sm font-semibold hover:bg-ink hover:text-white transition-all", !driver ? "" : "flex-1 py-2.5")}><Edit size={15} /> {driver && 'Redaguoti'}</button>
+          </div>
+
+          {relPlans.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">Keitimai</p>
+              <div className="space-y-1.5">
+                {relPlans.map(p => (
+                  <div key={p.id} className="flex items-center gap-2 text-xs bg-surface border border-hairline rounded-lg px-3 py-2">
+                    <span className="font-mono text-muted w-12 shrink-0">{format(parseISO(p.date), 'MM.dd')}</span>
+                    <span className="truncate">{p.leavingDriverName} → {p.incomingDriverName}</span>
+                    <span className={cn("ml-auto w-1.5 h-1.5 rounded-full shrink-0", p.status === 'Suplanuota' ? "bg-blue-400" : "bg-emerald-400")} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {assigns.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">Vairuotojų istorija</p>
+              <div className="space-y-1.5">
+                {assigns.map(a => (
+                  <div key={a.id} className="flex items-center gap-2 text-xs bg-surface border border-hairline rounded-lg px-3 py-2">
+                    <span className="font-semibold truncate">{a.driverName}</span>
+                    <span className="ml-auto text-muted shrink-0">{a.startDate} – {a.endDate || 'dabar'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {log.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">Veiksmų žurnalas</p>
+              <div className="space-y-2">
+                {log.map(h => (
+                  <div key={h.id} className="flex gap-3 text-xs">
+                    <span className="font-mono text-muted shrink-0 w-24">{h.timestamp}</span>
+                    <div className="min-w-0"><span className="font-semibold">{h.action}</span>{h.details && <p className="text-muted truncate">{h.details}</p>}</div>
                   </div>
                 ))}
               </div>
