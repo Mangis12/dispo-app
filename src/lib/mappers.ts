@@ -22,6 +22,9 @@ export const driverToRow = (d: Driver): Row => ({
   company_type: d.companyType,
   specialization: d.specialization,
   last_trip_end_date: d.lastTripEndDate ?? null,
+  email: d.email ?? null,
+  tab_nr: d.tabNr ?? null,
+  documents: d.docs ?? null,
 });
 
 export const driverFromRow = (r: Row): Driver => ({
@@ -37,6 +40,9 @@ export const driverFromRow = (r: Row): Driver => ({
   companyType: r.company_type as Driver['companyType'],
   specialization: r.specialization as Driver['specialization'],
   lastTripEndDate: (r.last_trip_end_date as string | null) ?? null,
+  email: (r.email as string | null) ?? undefined,
+  tabNr: (r.tab_nr as string | null) ?? undefined,
+  docs: (r.documents as Driver['docs']) ?? undefined,
 });
 
 // ── Car ──────────────────────────────────────────────────────────────────────

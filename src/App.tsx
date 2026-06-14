@@ -4,7 +4,8 @@ import {
   AlertCircle, UserPlus, LogOut, LogIn, X, Edit, History,
   CheckCircle2, User, Trash2, ChevronLeft, ChevronRight,
   LayoutDashboard, Database, Wifi, WifiOff, Bell, Map as MapIcon, MapPin, Menu, Search, Mail, Undo2, StickyNote,
-  List, LayoutGrid, Columns3, Download, Phone, Snowflake, Container
+  List, LayoutGrid, Columns3, Download, Phone, Snowflake, Container,
+  Upload, FileSpreadsheet, ShieldCheck, ShieldAlert, Contact, CreditCard, FileCheck2
 } from 'lucide-react';
 import {
   format, differenceInDays, parseISO, isBefore, isAfter,
@@ -20,6 +21,7 @@ import { loadAll, syncCollection, subscribeAll, type AllData } from './lib/repo'
 import TripPlanner from './components/TripPlanner';
 import CoordinatorBoard from './components/CoordinatorBoard';
 import { EmptyRoad, EmptyChecklist, SemiTruck, EuropeMap } from './components/illustrations';
+import { parseDriverWorkbook, mergeIntoDriver, buildDriverIndex, findExisting, type ParsedDriver } from './lib/importDrivers';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
   ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment, TaskPoint, CalendarNote
@@ -27,6 +29,37 @@ import type {
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+// Dokumento galiojimo būsena pagal datą (ISO). soon = ≤60 d. iki pabaigos.
+type DocState = 'none' | 'ok' | 'soon' | 'expired';
+function docState(iso?: string): { state: DocState; days: number | null } {
+  if (!iso) return { state: 'none', days: null };
+  const d = parseISO(iso);
+  if (!isValid(d)) return { state: 'none', days: null };
+  const days = differenceInDays(d, new Date());
+  if (days < 0) return { state: 'expired', days };
+  if (days <= 60) return { state: 'soon', days };
+  return { state: 'ok', days };
+}
+const DOC_FIELDS: { key: keyof NonNullable<Driver['docs']>; label: string }[] = [
+  { key: 'passportExpiry', label: 'Pasas' },
+  { key: 'licenseExpiry',  label: 'Teisės' },
+  { key: 'code95Expiry',   label: '95 kodas' },
+  { key: 'tachoCardExpiry',label: 'Tacho kortelė' },
+  { key: 'pinkSheetExpiry',label: 'Rožinis lapas' },
+  { key: 'llglExpiry',     label: 'LLGL' },
+];
+// Blogiausia vairuotojo dokumentų būsena (perspėjimui sąraše).
+function worstDocState(d: Driver): DocState {
+  if (!d.docs) return 'none';
+  let worst: DocState = 'none';
+  const rank: Record<DocState, number> = { none: 0, ok: 1, soon: 2, expired: 3 };
+  DOC_FIELDS.forEach(f => {
+    const s = docState(d.docs![f.key] as string | undefined).state;
+    if (rank[s] > rank[worst]) worst = s;
+  });
+  return worst;
 }
 
 // ─── Initial Data ─────────────────────────────────────────────────────────────
@@ -225,6 +258,11 @@ export default function App() {
   const [driverView, setDriverView]           = useState<'table' | 'kanban' | 'cards'>('table');
   const [profileDriver, setProfileDriver]     = useState<Driver | null>(null);
   const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>([]);
+  // Excel importas
+  const [importOpen, setImportOpen]           = useState(false);
+  const [importRows, setImportRows]           = useState<ParsedDriver[]>([]);
+  const [importMeta, setImportMeta]           = useState<{ fileName: string; cols: string[] } | null>(null);
+  const [importErr, setImportErr]             = useState<string | null>(null);
   // Automobilių „duomenų bazė"
   const [carView, setCarView]                 = useState<'table' | 'kanban' | 'cards'>('cards');
   const [profileCar, setProfileCar]           = useState<Car | null>(null);
@@ -367,6 +405,60 @@ export default function App() {
         carNumber: updates.currentCar !== undefined ? (updates.currentCar || a.carNumber) : a.carNumber,
       } : a));
     }
+  };
+
+  // ── Excel importas ──────────────────────────────────────────────────────────
+  const handleImportFile = async (file: File) => {
+    setImportErr(null);
+    try {
+      const buf = await file.arrayBuffer();
+      const { rows, headerMap } = parseDriverWorkbook(buf);
+      if (rows.length === 0) {
+        setImportErr('Faile nerasta vairuotojų eilučių. Patikrinkite, ar yra stulpeliai „Pavardė" ir „Vardas".');
+        setImportRows([]); setImportMeta(null);
+        return;
+      }
+      setImportRows(rows);
+      setImportMeta({ fileName: file.name, cols: Object.values(headerMap).filter(Boolean) });
+    } catch (e) {
+      setImportErr('Nepavyko nuskaityti failo. Tinka .xlsx, .xls arba .csv.');
+      setImportRows([]); setImportMeta(null);
+    }
+  };
+
+  // Suderinimo statistika: kiek naujų / kiek atnaujinamų.
+  const importDiff = useMemo(() => {
+    const index = buildDriverIndex(drivers);
+    let updated = 0, created = 0;
+    importRows.forEach(p => { if (findExisting(index, p)) updated++; else created++; });
+    return { updated, created };
+  }, [importRows, drivers]);
+
+  const applyImport = () => {
+    setDrivers(prev => {
+      const next = [...prev];
+      const index = buildDriverIndex(next);
+      importRows.forEach(p => {
+        const existing = findExisting(index, p);
+        if (existing) {
+          const merged = mergeIntoDriver(existing, p);
+          const idx = next.findIndex(d => d.id === existing.id);
+          if (idx >= 0) next[idx] = merged;
+        } else {
+          const created = { ...mergeIntoDriver(undefined, p), id: uid() };
+          next.push(created);
+          // Naujas vairuotojas papildo indeksą, kad to paties failo dublikatai susilietų.
+          const k = buildDriverIndex([created]);
+          k.byPc.forEach((v, key) => index.byPc.set(key, v));
+          k.byTab.forEach((v, key) => index.byTab.set(key, v));
+          k.byNm.forEach((v, key) => index.byNm.set(key, v));
+        }
+      });
+      return next;
+    });
+    showToast(`Importuota: ${importDiff.created} nauji, ${importDiff.updated} atnaujinti`);
+    setImportOpen(false);
+    setImportRows([]); setImportMeta(null); setImportErr(null);
   };
 
   const deleteDriver = (id: string) => {
@@ -1295,6 +1387,7 @@ export default function App() {
                 </select>
                 <input placeholder="Paieška..." className={cn(inputCls, 'w-36')} value={driverFilter.search} onChange={e => setDriverFilter(p => ({ ...p, search: e.target.value }))} />
                 <button onClick={() => exportDriversCSV(fd)} title="Eksportuoti visus į CSV" className="p-2 rounded-lg border border-hairline text-muted hover:text-ink hover:border-ink/30 transition-all"><Download size={15} /></button>
+                <button onClick={() => { setImportRows([]); setImportMeta(null); setImportErr(null); setImportOpen(true); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ink text-white text-xs font-semibold hover:bg-ink/85 transition-all"><Upload size={14} /> Importuoti Excel</button>
               </div>
             </div>
 
@@ -1322,7 +1415,7 @@ export default function App() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               {avatar(d)}
-                              <div><div className="font-semibold">{d.name}</div><div className="text-[10px] text-stone-400 font-mono">{d.phone}</div></div>
+                              <div><div className="font-semibold flex items-center gap-1.5">{d.name}{(() => { const w = worstDocState(d); return w === 'expired' ? <span title="Dokumentai pasibaigę"><ShieldAlert size={13} className="text-red-500" /></span> : w === 'soon' ? <span title="Dokumentai netrukus baigiasi"><ShieldAlert size={13} className="text-amber-500" /></span> : null; })()}</div><div className="text-[10px] text-stone-400 font-mono">{d.phone}</div></div>
                             </div>
                           </td>
                           <td className="px-4 py-3"><div className="flex gap-1.5"><Badge>{d.companyType}</Badge><Badge variant="blue">{d.specialization}</Badge></div></td>
@@ -1724,6 +1817,93 @@ export default function App() {
       {/* ══════════════════ MODALS ══════════════════ */}
 
       {/* Add Driver */}
+      {/* ── Excel importas ── */}
+      {importOpen && (
+        <div className="fixed inset-0 bg-ink/30 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-surface w-full max-w-3xl rounded-3xl shadow-float border border-hairline overflow-hidden slide-in-from-bottom-4 flex flex-col max-h-[88vh]">
+            <div className="px-6 py-5 flex items-center justify-between border-b border-hairline shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-ink flex items-center justify-center"><FileSpreadsheet size={17} className="text-gold-soft" /></div>
+                <div>
+                  <h2 className="text-base font-semibold tracking-tight">Importuoti vairuotojų sąrašą</h2>
+                  <p className="text-[11px] text-muted">Excel (.xlsx / .xls) arba .csv · duomenys atsinaujins sistemoje</p>
+                </div>
+              </div>
+              <button onClick={() => setImportOpen(false)} className="p-1.5 text-muted hover:text-ink hover:bg-stone-100 rounded-lg transition-colors"><X size={16} /></button>
+            </div>
+
+            <div className="px-6 py-5 overflow-y-auto">
+              {importRows.length === 0 ? (
+                <>
+                  <label className="block cursor-pointer">
+                    <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.currentTarget.value = ''; }} />
+                    <div className="border-2 border-dashed border-hairline hover:border-gold/60 rounded-2xl p-10 text-center transition-colors bg-canvas">
+                      <Upload size={28} className="mx-auto text-muted mb-3" />
+                      <p className="text-sm font-semibold text-ink">Pasirinkite Excel failą</p>
+                      <p className="text-xs text-muted mt-1">Stulpeliai atpažįstami automatiškai: Pavardė, Vardas, Tel, Paso galiojimo data, Teisių galiojimas, 95 kodo, Chip kortelės, Rožinio lapo, Asmens kodas, LLGL…</p>
+                    </div>
+                  </label>
+                  {importErr && <p className="mt-4 text-xs font-medium text-red-600 bg-red-50 rounded-xl px-3 py-2.5">{importErr}</p>}
+                  <div className="mt-4 flex items-start gap-2 text-[11px] text-muted bg-gold/5 border border-gold/20 rounded-xl px-3 py-2.5">
+                    <ShieldCheck size={14} className="text-gold shrink-0 mt-0.5" />
+                    <span>Atitikimas pagal <b>Asmens kodą</b> (jei nėra — DS numerį, tada vardą+pavardę). Esami vairuotojai <b>atnaujinami</b>, nauji — <b>pridedami</b>. Reiso būsenos ir istorija nekeičiamos.</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center gap-2 mb-4">
+                    <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg">+{importDiff.created} nauji</span>
+                    <span className="text-xs font-semibold bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg">{importDiff.updated} atnaujinami</span>
+                    <span className="text-xs text-muted ml-1">{importMeta?.fileName} · {importRows.length} eilutės</span>
+                    <button onClick={() => { setImportRows([]); setImportMeta(null); }} className="ml-auto text-xs text-muted hover:text-ink underline">Kitas failas</button>
+                  </div>
+                  <div className="rounded-xl border border-hairline overflow-hidden overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead><tr className="bg-ink text-white text-left">
+                        <th className="px-3 py-2 font-bold">Vairuotojas</th>
+                        <th className="px-3 py-2 font-bold">Įmonė/Tipas</th>
+                        <th className="px-3 py-2 font-bold">Pasas</th>
+                        <th className="px-3 py-2 font-bold">Teisės</th>
+                        <th className="px-3 py-2 font-bold">95 k.</th>
+                        <th className="px-3 py-2 font-bold">Tacho</th>
+                        <th className="px-3 py-2 font-bold">LLGL</th>
+                      </tr></thead>
+                      <tbody>
+                        {importRows.slice(0, 60).map((p, i) => {
+                          const cell = (iso?: string) => {
+                            const s = docState(iso).state;
+                            return <td className={cn('px-3 py-2 whitespace-nowrap font-mono', s === 'expired' ? 'text-red-600 font-bold' : s === 'soon' ? 'text-amber-600 font-semibold' : 'text-muted')}>{iso || '—'}</td>;
+                          };
+                          return (
+                            <tr key={i} className="border-t border-hairline odd:bg-canvas/40">
+                              <td className="px-3 py-2"><span className="font-semibold text-ink">{p.name}</span>{p.docs.personalCode && <span className="block text-[10px] text-muted font-mono">{p.docs.personalCode}</span>}</td>
+                              <td className="px-3 py-2 whitespace-nowrap">{p.companyType} · {p.specialization}</td>
+                              {cell(p.docs.passportExpiry)}
+                              {cell(p.docs.licenseExpiry)}
+                              {cell(p.docs.code95Expiry)}
+                              {cell(p.docs.tachoCardExpiry)}
+                              {cell(p.docs.llglExpiry)}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {importRows.length > 60 && <p className="text-[11px] text-muted mt-2">Rodoma 60 iš {importRows.length}. Importuojami visi.</p>}
+                </>
+              )}
+            </div>
+
+            {importRows.length > 0 && (
+              <div className="px-6 py-4 border-t border-hairline flex items-center justify-end gap-2 shrink-0">
+                <button onClick={() => setImportOpen(false)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-muted hover:text-ink hover:bg-stone-100 transition-colors">Atšaukti</button>
+                <button onClick={applyImport} className="inline-flex items-center gap-2 bg-ink text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-ink/85 transition-all"><FileCheck2 size={15} /> Importuoti į sistemą</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {addDriverOpen && (
         <Modal title="Naujas vairuotojas" onClose={() => setAddDriverOpen(false)}>
           <form className="space-y-4" onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); addDriver({ name: f.get('name') as string, phone: f.get('phone') as string, status: 'Namuose', currentCar: 'Nėra', startDate: null, plannedReturnDate: null, homeStatus: 'Poilsis', readinessDate: format(new Date(), 'yyyy-MM-dd'), companyType: f.get('companyType') as RegistrationType, specialization: f.get('specialization') as DriverSpecialization }); }}>
@@ -2120,8 +2300,20 @@ function DriverProfileDrawer({ driver, plans, carAssignments, history, onClose, 
   const d = driver;
   const initials = d.name.split(' ').map(w => w[0]).slice(0, 2).join('');
   const relPlans = plans.filter(p => p.leavingDriverId === d.id || p.incomingDriverId === d.id).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
-  const assigns = carAssignments.filter(a => a.driverId === d.id).sort((a, b) => b.startDate.localeCompare(a.startDate)).slice(0, 6);
-  const log = history.filter(h => h.driverId === d.id).slice(0, 10);
+  // Darbo / poilsio istorija: priskyrimai = darbas (ant mašinos), tarpai = poilsis
+  const dAssigns = carAssignments.filter(a => a.driverId === d.id).sort((a, b) => a.startDate.localeCompare(b.startDate));
+  type TLItem = { type: 'work' | 'rest'; car?: string; from: string; to: string | null };
+  const timeline: TLItem[] = [];
+  dAssigns.forEach((a, i) => {
+    timeline.push({ type: 'work', car: a.carNumber, from: a.startDate, to: a.endDate });
+    const next = dAssigns[i + 1];
+    if (a.endDate && next && a.endDate < next.startDate) timeline.push({ type: 'rest', from: a.endDate, to: next.startDate });
+  });
+  const lastA = dAssigns[dAssigns.length - 1];
+  if (d.status === 'Namuose' && lastA?.endDate) timeline.push({ type: 'rest', from: lastA.endDate, to: null });
+  else if (d.status === 'Namuose' && d.lastTripEndDate && dAssigns.length === 0) timeline.push({ type: 'rest', from: d.lastTripEndDate, to: null });
+  const tl = timeline.slice(-12).reverse();
+  const dayCount = (from: string, to: string | null) => { try { return differenceInDays(to ? parseISO(to) : new Date(), parseISO(from)); } catch { return 0; } };
   const isLate = d.status === 'Reise' && !!d.plannedReturnDate && isBefore(parseISO(d.plannedReturnDate), new Date());
   const Row = ({ k, v }: { k: string; v: React.ReactNode }) => (
     <div className="flex items-center justify-between gap-3 py-1.5"><span className="text-xs text-muted">{k}</span><span className="text-sm font-medium text-right">{v}</span></div>
@@ -2173,6 +2365,58 @@ function DriverProfileDrawer({ driver, plans, carAssignments, history, onClose, 
             <button onClick={() => onEdit(d)} className="inline-flex items-center justify-center gap-2 px-4 bg-ink/[0.05] text-ink rounded-xl text-sm font-semibold hover:bg-ink hover:text-white transition-all"><Edit size={15} /></button>
           </div>
 
+          {/* Dokumentai ir galiojimai */}
+          {(d.docs || d.email || d.tabNr) && (() => {
+            const docs = d.docs ?? {};
+            const items = DOC_FIELDS.map(f => ({ ...f, iso: docs[f.key] as string | undefined, ...docState(docs[f.key] as string | undefined) }))
+              .filter(it => it.iso);
+            const expired = items.filter(it => it.state === 'expired').length;
+            const soon = items.filter(it => it.state === 'soon').length;
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Dokumentai</p>
+                  {expired > 0 ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full"><ShieldAlert size={11} />{expired} pasibaigę</span>
+                    : soon > 0 ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full"><ShieldAlert size={11} />{soon} baigiasi</span>
+                    : items.length > 0 ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full"><ShieldCheck size={11} />Galioja</span> : null}
+                </div>
+
+                {/* Tapatybės info */}
+                {(docs.personalCode || docs.passportNo || docs.tachoCountry || d.email || d.tabNr) && (
+                  <div className="bg-surface rounded-2xl border border-hairline p-3 mb-2 grid grid-cols-2 gap-x-4 gap-y-1.5">
+                    {docs.personalCode && <div><p className="text-[10px] text-muted">Asmens kodas</p><p className="text-xs font-mono font-medium">{docs.personalCode}</p></div>}
+                    {docs.passportNo && <div><p className="text-[10px] text-muted">Paso NR.</p><p className="text-xs font-mono font-medium">{docs.passportNo}</p></div>}
+                    {docs.tachoCountry && <div><p className="text-[10px] text-muted">Tacho šalis</p><p className="text-xs font-medium">{docs.tachoCountry}</p></div>}
+                    {d.tabNr && <div><p className="text-[10px] text-muted">DS Nr.</p><p className="text-xs font-mono font-medium">{d.tabNr}</p></div>}
+                    {d.email && <div className="col-span-2 min-w-0"><p className="text-[10px] text-muted">El. paštas</p><a href={`mailto:${d.email}`} className="text-xs font-medium text-blue-600 hover:underline truncate block">{d.email}</a></div>}
+                  </div>
+                )}
+
+                {/* Galiojimai */}
+                {items.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {items.map(it => (
+                      <div key={it.key} className={cn('flex items-center gap-3 rounded-xl px-3 py-2 border',
+                        it.state === 'expired' ? 'bg-red-50 border-red-200' : it.state === 'soon' ? 'bg-amber-50 border-amber-200' : 'bg-surface border-hairline')}>
+                        <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0',
+                          it.state === 'expired' ? 'bg-red-100 text-red-600' : it.state === 'soon' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-50 text-emerald-600')}>
+                          {it.key === 'passportExpiry' ? <Contact size={14} /> : it.key === 'tachoCardExpiry' ? <CreditCard size={14} /> : <FileCheck2 size={14} />}
+                        </div>
+                        <span className="text-[13px] font-semibold flex-1">{it.label}</span>
+                        <div className="text-right">
+                          <p className={cn('text-xs font-mono font-semibold', it.state === 'expired' ? 'text-red-600' : it.state === 'soon' ? 'text-amber-700' : 'text-ink')}>{it.iso}</p>
+                          <p className={cn('text-[10px]', it.state === 'expired' ? 'text-red-500' : it.state === 'soon' ? 'text-amber-600' : 'text-muted')}>
+                            {it.days != null ? (it.days < 0 ? `Pasibaigė prieš ${Math.abs(it.days)} d.` : it.days === 0 ? 'Baigiasi šiandien' : `Liko ${it.days} d.`) : ''}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="text-xs text-muted">Dokumentų datų nėra. Importuokite Excel sąrašą.</p>}
+              </div>
+            );
+          })()}
+
           {/* Susiję planai */}
           {relPlans.length > 0 && (
             <div>
@@ -2190,35 +2434,28 @@ function DriverProfileDrawer({ driver, plans, carAssignments, history, onClose, 
             </div>
           )}
 
-          {/* Priskyrimų istorija */}
-          {assigns.length > 0 && (
+          {/* Darbo / poilsio istorija */}
+          {tl.length > 0 && (
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">Mašinų istorija</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">Darbo ir poilsio istorija</p>
               <div className="space-y-1.5">
-                {assigns.map(a => (
-                  <div key={a.id} className="flex items-center gap-2 text-xs bg-surface border border-hairline rounded-lg px-3 py-2">
-                    <span className="font-mono font-semibold bg-ink/[0.06] px-1.5 py-0.5 rounded shrink-0">{a.carNumber}</span>
-                    <span className="text-muted">{a.startDate} – {a.endDate || 'dabar'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Veiksmų žurnalas */}
-          {log.length > 0 && (
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">Veiksmų žurnalas</p>
-              <div className="space-y-2">
-                {log.map(h => (
-                  <div key={h.id} className="flex gap-3 text-xs">
-                    <span className="font-mono text-muted shrink-0 w-24">{h.timestamp}</span>
-                    <div className="min-w-0">
-                      <span className="font-semibold">{h.action}</span>
-                      {h.details && <p className="text-muted truncate">{h.details}</p>}
+                {tl.map((it, i) => {
+                  const days = dayCount(it.from, it.to);
+                  return (
+                    <div key={i} className="flex items-center gap-3 bg-surface border border-hairline rounded-xl px-3 py-2.5">
+                      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", it.type === 'work' ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600")}>
+                        {it.type === 'work' ? <Truck size={15} /> : <Home size={15} />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-semibold leading-tight">
+                          {it.type === 'work' ? <>Dirbo · <span className="font-mono">{it.car}</span></> : 'Ilsėjosi'}
+                        </p>
+                        <p className="text-[11px] text-muted">{it.from} – {it.to || 'dabar'}</p>
+                      </div>
+                      <span className="text-[11px] font-medium text-muted shrink-0 tabular-nums">{days > 0 ? `${days} d.` : ''}</span>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -2303,28 +2540,21 @@ function CarProfileDrawer({ car, drivers, plans, carAssignments, history, onClos
 
           {assigns.length > 0 && (
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">Vairuotojų istorija</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">Kas vairavo šią mašiną</p>
               <div className="space-y-1.5">
-                {assigns.map(a => (
-                  <div key={a.id} className="flex items-center gap-2 text-xs bg-surface border border-hairline rounded-lg px-3 py-2">
-                    <span className="font-semibold truncate">{a.driverName}</span>
-                    <span className="ml-auto text-muted shrink-0">{a.startDate} – {a.endDate || 'dabar'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {log.length > 0 && (
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">Veiksmų žurnalas</p>
-              <div className="space-y-2">
-                {log.map(h => (
-                  <div key={h.id} className="flex gap-3 text-xs">
-                    <span className="font-mono text-muted shrink-0 w-24">{h.timestamp}</span>
-                    <div className="min-w-0"><span className="font-semibold">{h.action}</span>{h.details && <p className="text-muted truncate">{h.details}</p>}</div>
-                  </div>
-                ))}
+                {assigns.map(a => {
+                  let days = 0; try { days = differenceInDays(a.endDate ? parseISO(a.endDate) : new Date(), parseISO(a.startDate)); } catch { /* ignore */ }
+                  return (
+                    <div key={a.id} className="flex items-center gap-3 bg-surface border border-hairline rounded-xl px-3 py-2.5">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-semibold shrink-0">{a.driverName.split(' ').map(w => w[0]).slice(0, 2).join('')}</div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-semibold truncate leading-tight">{a.driverName}</p>
+                        <p className="text-[11px] text-muted">{a.startDate} – {a.endDate || 'dabar'}</p>
+                      </div>
+                      <span className="text-[11px] font-medium text-muted shrink-0 tabular-nums">{days > 0 ? `${days} d.` : ''}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

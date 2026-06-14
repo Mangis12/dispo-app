@@ -4,6 +4,19 @@ export type RegistrationType = 'LT' | 'PL';
 export type DriverSpecialization = 'Tentas' | 'Refas' | 'Universalus';
 export type CarType = 'Tentas' | 'Refas';
 
+// Vairuotojo dokumentų galiojimai (iš Excel sąrašo). Visi datų laukai — 'yyyy-MM-dd'.
+export interface DriverDocs {
+  personalCode?: string;     // Asmens kodas
+  passportNo?: string;       // Paso NR.
+  passportExpiry?: string;   // Paso galiojimo data
+  licenseExpiry?: string;    // Teisių galiojimas
+  code95Expiry?: string;     // 95 kodo galiojimas
+  tachoCardExpiry?: string;  // Chip kortelės galiojimas (tacho)
+  tachoCountry?: string;     // Tacho šalis
+  pinkSheetExpiry?: string;  // Rožinio lapo galiojimas
+  llglExpiry?: string;       // LLGL galiojimas
+}
+
 export interface Driver {
   id: string;
   name: string;
@@ -17,6 +30,9 @@ export interface Driver {
   companyType: RegistrationType;
   specialization: DriverSpecialization;
   lastTripEndDate?: string | null;
+  email?: string;
+  tabNr?: string;            // DS / vidinis numeris
+  docs?: DriverDocs;
 }
 
 export interface Car {
