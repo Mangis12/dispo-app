@@ -18,7 +18,8 @@ import { supabase, isSupabaseEnabled } from './lib/supabase';
 import { loadAll, syncCollection, subscribeAll, type AllData } from './lib/repo';
 import TripPlanner from './components/TripPlanner';
 import CoordinatorBoard from './components/CoordinatorBoard';
-import { EmptyRoad, EmptyChecklist, SemiTruck, RouteMark, EuropeMap, SprinterVan } from './components/illustrations';
+import { EmptyRoad, EmptyChecklist, SemiTruck, RouteMark, EuropeMap, VanSilhouette } from './components/illustrations';
+import { VestexLogo, VestexMark } from './components/logo';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
   ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment, TaskPoint, CalendarNote
@@ -734,14 +735,8 @@ export default function App() {
         "fixed lg:sticky top-0 z-50 lg:z-30 h-screen w-64 shrink-0 flex flex-col bg-canvas border-r border-hairline transition-transform duration-300 lg:translate-x-0",
         sidebarOpen ? "translate-x-0 shadow-float" : "-translate-x-full"
       )}>
-        <div className="flex items-center gap-2.5 px-5 h-16 shrink-0">
-          <div className="w-9 h-9 bg-ink rounded-2xl flex items-center justify-center ring-1 ring-gold/30">
-            <Truck className="text-gold-soft w-4 h-4" />
-          </div>
-          <div>
-            <p className="text-[17px] font-display font-medium tracking-tight leading-none">Dispečeris</p>
-            <p className="text-[10px] text-muted tracking-[0.12em] uppercase mt-1">Vestex Transport</p>
-          </div>
+        <div className="flex items-center gap-2.5 px-5 h-16 shrink-0 border-b border-hairline/60">
+          <VestexLogo />
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
@@ -813,19 +808,20 @@ export default function App() {
         {/* ══════════════════ DASHBOARD ══════════════════ */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
-            {/* Hero juosta — reali nuotrauka + Ken Burns, premium (Etihad dvasia) */}
-            <div className="relative overflow-hidden rounded-3xl border border-hairline shadow-card h-44 sm:h-52">
-              <img src="/img/truck-eu.jpg" alt="" className="absolute inset-0 w-full h-full object-cover kenburns" />
-              <div className="absolute inset-0 bg-gradient-to-r from-ink/80 via-ink/45 to-transparent" />
-              <div className="absolute inset-0 mix-blend-multiply bg-[#9C7B36]/10" />
-              <div className="relative h-full flex flex-col justify-center px-6 sm:px-9 max-w-xl text-white">
-                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-gold-soft drop-shadow">{format(new Date(), "EEEE, MMMM d", { locale: lt })}</p>
-                <h2 className="font-display text-2xl sm:text-3xl font-medium tracking-tight mt-1 drop-shadow-sm">
+            {/* Hero juosta — DAF XF nuotrauka pilna (be apkarpymo), premium poster */}
+            <div className="relative overflow-hidden rounded-3xl border border-hairline shadow-card h-48 sm:h-56 bg-gradient-to-r from-surface via-canvas to-[#e3edf6]">
+              {/* DAF XF — visa mašina matoma (object-contain) */}
+              <img src="/img/daf-xf.jpg" alt="DAF XF" className="absolute inset-y-0 right-0 h-full w-auto max-w-[58%] object-contain object-right-bottom" />
+              <div className="absolute inset-0 bg-gradient-to-r from-canvas via-canvas/85 to-transparent" />
+              <VestexMark className="absolute right-5 bottom-4 h-7 w-auto opacity-25" />
+              <div className="relative h-full flex flex-col justify-center px-6 sm:px-9 max-w-md">
+                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-gold">{format(new Date(), "EEEE, MMMM d", { locale: lt })}</p>
+                <h2 className="font-display text-2xl sm:text-3xl font-medium tracking-tight mt-1 text-ink">
                   {(() => { const h = new Date().getHours(); return h < 12 ? 'Labas rytas' : h < 18 ? 'Laba diena' : 'Labas vakaras'; })()}
                 </h2>
-                <p className="text-sm text-white/85 mt-1.5">
-                  Šiandien <b className="font-semibold text-white">{reiseDrivers.length}</b> reise · <b className="font-semibold text-white">{namuoseDrivers.length}</b> namuose
-                  {urgentCount > 0 && <> · <span className="text-red-300 font-semibold">{urgentCount} skubu</span></>}
+                <p className="text-sm text-muted mt-1.5">
+                  Šiandien <b className="font-semibold text-ink">{reiseDrivers.length}</b> reise · <b className="font-semibold text-ink">{namuoseDrivers.length}</b> namuose
+                  {urgentCount > 0 && <> · <span className="text-red-500 font-semibold">{urgentCount} skubu</span></>}
                 </p>
               </div>
             </div>
@@ -1482,7 +1478,7 @@ export default function App() {
         {activeTab === 'trip' && (
           <div className="space-y-5">
             <PageBanner h="xtall" bg={<EuropeMap className="w-full h-full opacity-80" />}
-              art={<SprinterVan className="w-56 lg:w-72 h-auto opacity-90" stroke="#EDE2C9" />}
+              art={<VanSilhouette className="w-52 lg:w-64 h-auto opacity-95 drop-shadow-lg" fill="#EDE2C9" />}
               eyebrow="Logistika" title="Keitimo kelionės planavimas" subtitle="Mikroautobusai, maršrutai ir užduotys viename žemėlapyje" />
             <TripPlanner drivers={drivers} plans={plans} cars={cars} taskPoints={taskPoints} onConsumeTask={(id) => updateTaskPoint(id, { active: false })} showToast={(msg, type) => setToast({ message: msg, type: type ?? 'success' })} />
           </div>
@@ -1925,40 +1921,73 @@ function PlanCard({ plan, drivers, cars, plans, onComplete, onDelete, onEdit, ed
   editingPlanId: string | null; setEditingPlanId: (id: string | null) => void;
   setPlans: React.Dispatch<React.SetStateAction<ReplacementPlan[]>>;
 }) {
+  const car = cars.find(c => c.number === plan.carNumber);
+  const leaving = drivers.find(d => d.id === plan.leavingDriverId);
+  const incoming = drivers.find(d => d.id === plan.incomingDriverId);
+  const initials = (name: string) => name.split(' ').map(w => w[0]).slice(0, 2).join('');
   return (
-    <div className="bg-surface border border-hairline rounded-2xl p-5 hover:shadow-md transition-all">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        {/* Date */}
-        <div className="flex flex-col items-center min-w-[60px]">
-          <div className="w-12 h-12 rounded-2xl bg-ink text-white flex flex-col items-center justify-center">
-            <span className="text-lg font-black leading-none">{format(parseISO(plan.date), 'dd')}</span>
-            <span className="text-[8px] uppercase opacity-60">{format(parseISO(plan.date), 'EEE', { locale: lt })}</span>
+    <div className="group/plan relative overflow-hidden bg-surface border border-hairline rounded-2xl p-4 sm:p-5 hover:border-gold/40 hover:shadow-float transition-all">
+      {/* Subtilus aukso akcentas kairėje */}
+      <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-gold/0 via-gold to-gold/0 opacity-0 group-hover/plan:opacity-100 transition-opacity" />
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+        {/* Data + mašina */}
+        <div className="flex flex-row sm:flex-col items-center gap-2 sm:gap-1.5 sm:min-w-[64px]">
+          <div className="w-12 h-12 rounded-2xl bg-ink text-white flex flex-col items-center justify-center shadow-card">
+            <span className="text-lg font-display font-semibold leading-none">{format(parseISO(plan.date), 'dd')}</span>
+            <span className="text-[8px] uppercase tracking-wide text-gold-soft">{format(parseISO(plan.date), 'EEE', { locale: lt })}</span>
           </div>
-          <span className="mt-1.5 text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{plan.carNumber}</span>
-        </div>
-
-        {/* Exchange */}
-        <div className="flex-1 flex items-center gap-4">
-          <div className="flex-1 text-right">
-            <p className="text-[9px] text-red-500 font-black uppercase mb-0.5 flex items-center justify-end gap-1"><LogOut size={9}/>Namo</p>
-            <p className="font-bold text-sm">{plan.leavingDriverName}</p>
-          </div>
-          <div className="w-8 h-8 rounded-xl bg-canvas border border-hairline flex items-center justify-center shrink-0">
-            <ArrowRightLeft size={14} className="text-stone-400"/>
-          </div>
-          <div className="flex-1">
-            <p className="text-[9px] text-emerald-500 font-black uppercase mb-0.5 flex items-center gap-1"><LogIn size={9}/>Į reisą</p>
-            <p className="font-bold text-sm">{plan.incomingDriverName}</p>
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="font-mono text-[10px] font-bold text-ink bg-ink/[0.06] px-2 py-0.5 rounded">{plan.carNumber}</span>
+            {car && <span className="text-[8px] uppercase tracking-wide text-muted">{car.type}</span>}
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Keitimas: išvykstantis vairuotojas → (mašina) → atvykstantis */}
+        <div className="flex-1 flex items-center gap-2 sm:gap-3">
+          {/* Namo grįžtantis */}
+          <div className="flex-1 flex items-center gap-2 justify-end text-right min-w-0">
+            <div className="min-w-0">
+              <p className="text-[8px] text-red-500 font-bold uppercase tracking-wide flex items-center justify-end gap-1"><LogOut size={9}/>Namo</p>
+              <p className="font-semibold text-sm truncate">{plan.leavingDriverName}</p>
+              {leaving && <p className="text-[10px] text-muted truncate">{leaving.companyType} · {leaving.specialization}</p>}
+            </div>
+            <div className="w-9 h-9 rounded-full bg-red-50 text-red-500 flex items-center justify-center text-[11px] font-bold shrink-0">{initials(plan.leavingDriverName)}</div>
+          </div>
+
+          {/* Maršruto jungtis su mašina */}
+          <div className="relative flex flex-col items-center shrink-0 px-1">
+            <div className="absolute top-1/2 -translate-y-1/2 w-full border-t border-dashed border-hairline" />
+            <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-ink to-[#3a3122] text-gold-soft flex items-center justify-center shadow-card">
+              <SemiTruck className="w-6 h-auto" stroke="currentColor" />
+            </div>
+          </div>
+
+          {/* Į reisą einantis (paryškintas — pakeitėjas) */}
+          <div className="flex-1 flex items-center gap-2 min-w-0">
+            <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[11px] font-bold shrink-0 ring-2 ring-emerald-200">{initials(plan.incomingDriverName)}</div>
+            <div className="min-w-0">
+              <p className="text-[8px] text-emerald-600 font-bold uppercase tracking-wide flex items-center gap-1"><LogIn size={9}/>Į reisą</p>
+              <p className="font-semibold text-sm truncate">{plan.incomingDriverName}</p>
+              {incoming && <p className="text-[10px] text-muted truncate">{incoming.companyType} · {incoming.specialization}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Veiksmai */}
         <div className="flex sm:flex-col gap-2 border-t sm:border-t-0 sm:border-l border-hairline pt-3 sm:pt-0 sm:pl-4 w-full sm:w-auto">
           <button onClick={onComplete} className="flex-1 sm:flex-none p-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl transition-all" title="Įvykdyta"><CheckCircle2 size={16}/></button>
-          <button onClick={onEdit}    className="flex-1 sm:flex-none p-2.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all" title="Redaguoti"><Edit size={16}/></button>
+          <button onClick={onEdit}    className="flex-1 sm:flex-none p-2.5 bg-ink/[0.05] text-ink hover:bg-ink hover:text-white rounded-xl transition-all" title="Redaguoti"><Edit size={16}/></button>
           <button onClick={onDelete}  className="flex-1 sm:flex-none p-2.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all" title="Ištrinti"><X size={16}/></button>
         </div>
       </div>
+
+      {/* Keitimo taškas / užduotis (jei nustatyta koordinatoriaus) */}
+      {plan.changeLocation && (
+        <div className="mt-3 pt-3 border-t border-hairline flex items-center gap-2 text-[11px] text-muted">
+          <MapPin size={12} className="text-gold shrink-0" />
+          <span className="truncate">{plan.changeLocation}{plan.changeTask ? <> · <span className="text-amber-600">📦 {plan.changeTask}</span></> : ''}</span>
+        </div>
+      )}
     </div>
   );
 }

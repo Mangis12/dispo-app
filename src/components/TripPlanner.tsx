@@ -34,7 +34,7 @@ function Badge({ children }: { children: React.ReactNode }) {
 }
 
 const BASE = { lat: 54.9127, lng: 23.9417, name: 'Ateities pl. 23, Kaunas' };
-const VEH_COLORS = ['#003087', '#CC1427', '#15803d', '#7c3aed', '#c2780c', '#0891b2'];
+const VEH_COLORS = ['#272219', '#CC1427', '#15803d', '#7c3aed', '#c2780c', '#0891b2'];
 const uid = () => Math.random().toString(36).slice(2, 9);
 const mkVehicle = (idx: number): TripVehicle => ({
   id: uid(), number: '', capacity: 4, color: VEH_COLORS[idx] || VEH_COLORS[0], stops: [], additionalWork: '',
@@ -282,7 +282,7 @@ export default function TripPlanner({ drivers, plans, cars = [], taskPoints = []
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-[#003087]">Keitimo kelionės planavimas</h2>
+          <h2 className="text-xl font-bold text-[#272219]">Keitimo kelionės planavimas</h2>
           <p className="text-xs text-slate-400 mt-0.5">Bazė: 🏢 {BASE.name} — maršrutas pirmyn ir atgal</p>
         </div>
       </div>
@@ -302,7 +302,7 @@ export default function TripPlanner({ drivers, plans, cars = [], taskPoints = []
           </button>
         ))}
         {tripFleet.length < 6 && (
-          <button onClick={addVehicle} className="px-3 py-2 rounded-xl text-xs font-bold border-2 border-dashed border-slate-300 text-slate-400 hover:border-[#003087] hover:text-[#003087] transition-all">
+          <button onClick={addVehicle} className="px-3 py-2 rounded-xl text-xs font-bold border-2 border-dashed border-slate-300 text-slate-400 hover:border-[#272219] hover:text-[#272219] transition-all">
             + Pridėti transportą
           </button>
         )}
@@ -327,7 +327,7 @@ export default function TripPlanner({ drivers, plans, cars = [], taskPoints = []
                   loaded ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-hairline')}>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-[11px] font-bold bg-[#003087] text-white px-1.5 py-0.5 rounded">{p.carNumber}</span>
+                      <span className="font-mono text-[11px] font-bold bg-[#272219] text-white px-1.5 py-0.5 rounded">{p.carNumber}</span>
                       {carType(p.carNumber) && <span className="text-[10px] text-slate-400">{carType(p.carNumber)}</span>}
                       {p.changeTask && <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">📦 +užduotis</span>}
                     </div>
@@ -389,10 +389,10 @@ export default function TripPlanner({ drivers, plans, cars = [], taskPoints = []
           <div className="bg-surface rounded-2xl border-2 p-4 shadow-sm space-y-3" style={{ borderColor: activeVeh.color }}>
             <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
               <div className="w-4 h-4 rounded-full shrink-0" style={{ background: activeVeh.color }} />
-              <h3 className="font-bold text-[#003087] text-sm">Transporto priemonė #{activeVehIdx + 1}</h3>
+              <h3 className="font-bold text-[#272219] text-sm">Transporto priemonė #{activeVehIdx + 1}</h3>
               {routeInfo[activeVeh.id] && (
                 <div className="ml-auto flex items-center gap-3 text-xs">
-                  <span className="font-black text-[#003087]">📏 {routeInfo[activeVeh.id]!.km} km</span>
+                  <span className="font-black text-[#272219]">📏 {routeInfo[activeVeh.id]!.km} km</span>
                   <span className="text-slate-400">⏱ ~{routeInfo[activeVeh.id]!.h} val.</span>
                 </div>
               )}
@@ -420,7 +420,7 @@ export default function TripPlanner({ drivers, plans, cars = [], taskPoints = []
           {/* Mode toggle + City search */}
           <div className="bg-surface rounded-2xl border border-hairline p-4 shadow-sm space-y-3">
             <div className="flex items-center gap-2">
-              <p className="text-xs font-bold text-[#003087] shrink-0">Pridėti:</p>
+              <p className="text-xs font-bold text-[#272219] shrink-0">Pridėti:</p>
               <div className="flex bg-slate-100 p-1 rounded-xl gap-1 flex-1">
                 <button onClick={() => setTripMode('driver')}
                   className={cn('flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all',
@@ -433,7 +433,7 @@ export default function TripPlanner({ drivers, plans, cars = [], taskPoints = []
             </div>
 
             <div className={cn('text-xs px-3 py-2 rounded-xl font-medium',
-              tripMode === 'task' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-[#003087]/5 text-[#003087]')}>
+              tripMode === 'task' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-[#272219]/5 text-[#272219]')}>
               {tripMode === 'task'
                 ? '📦 Spusk ant žemėlapio — žymėsi užduoties tašką (pasiimti dokumentus, pristatyti krovinio raktus ir t.t.)'
                 : '🚗 Spusk ant žemėlapio — žymėsi vairuotojo keitimo stotelę'}
@@ -453,7 +453,7 @@ export default function TripPlanner({ drivers, plans, cars = [], taskPoints = []
           {/* Stops list */}
           <div className="bg-surface rounded-2xl border border-hairline p-4 shadow-sm space-y-3">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-[#003087] text-sm">Stotelės</h3>
+              <h3 className="font-bold text-[#272219] text-sm">Stotelės</h3>
               <span className="text-slate-400 text-xs">({activeVeh.stops.length}/{activeVeh.capacity})</span>
               {routeInfo[activeVeh.id] && (
                 <span className="ml-auto text-xs font-black px-2 py-0.5 rounded-full text-white" style={{ background: activeVeh.color }}>
@@ -486,12 +486,12 @@ export default function TripPlanner({ drivers, plans, cars = [], taskPoints = []
                           {isTask ? '📦' : i + 1}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className={cn('font-bold text-sm truncate', isTask ? 'text-amber-800' : 'text-[#003087]')}>{stop.city}</p>
+                          <p className={cn('font-bold text-sm truncate', isTask ? 'text-amber-800' : 'text-[#272219]')}>{stop.city}</p>
                           {isTask && <p className="text-xs text-amber-600 font-semibold">Užduoties taškas</p>}
                         </div>
                         <div className="flex gap-0.5 shrink-0">
-                          <button onClick={() => moveStop(activeVeh.id, stop.id, -1)} disabled={i === 0} className="p-1 text-slate-300 hover:text-[#003087] disabled:opacity-20 text-xs">▲</button>
-                          <button onClick={() => moveStop(activeVeh.id, stop.id, 1)} disabled={i === activeVeh.stops.length - 1} className="p-1 text-slate-300 hover:text-[#003087] disabled:opacity-20 text-xs">▼</button>
+                          <button onClick={() => moveStop(activeVeh.id, stop.id, -1)} disabled={i === 0} className="p-1 text-slate-300 hover:text-[#272219] disabled:opacity-20 text-xs">▲</button>
+                          <button onClick={() => moveStop(activeVeh.id, stop.id, 1)} disabled={i === activeVeh.stops.length - 1} className="p-1 text-slate-300 hover:text-[#272219] disabled:opacity-20 text-xs">▼</button>
                           <button onClick={() => removeStop(activeVeh.id, stop.id)} className="p-1 text-[#CC1427]/40 hover:text-[#CC1427] text-xs ml-0.5">✕</button>
                         </div>
                       </div>
@@ -563,7 +563,7 @@ export default function TripPlanner({ drivers, plans, cars = [], taskPoints = []
         {/* RIGHT: Map */}
         <div>
           <div className="bg-surface rounded-2xl border border-hairline overflow-hidden shadow-sm" style={{ height: '560px' }}>
-            <div className="px-4 py-3 flex items-center gap-2 flex-wrap" style={{ background: 'linear-gradient(90deg,#003087 0%,#004ab5 100%)' }}>
+            <div className="px-4 py-3 flex items-center gap-2 flex-wrap" style={{ background: 'linear-gradient(90deg,#272219 0%,#3a3122 100%)' }}>
               <span className="text-white text-sm font-bold">🗺️ Žemėlapis</span>
               <div className="flex items-center gap-1.5 flex-wrap ml-2">
                 {tripFleet.map((v, i) => (
@@ -581,8 +581,8 @@ export default function TripPlanner({ drivers, plans, cars = [], taskPoints = []
 
       {/* INSTRUCTIONS (all vehicles) */}
       {tripFleet.some((v) => v.stops.length > 0 || v.number) && (
-        <div className="bg-surface rounded-2xl border border-[#003087]/15 overflow-hidden shadow-sm">
-          <div className="px-5 py-4 flex items-center gap-3" style={{ background: 'linear-gradient(90deg,#003087 0%,#004ab5 100%)' }}>
+        <div className="bg-surface rounded-2xl border border-[#272219]/15 overflow-hidden shadow-sm">
+          <div className="px-5 py-4 flex items-center gap-3" style={{ background: 'linear-gradient(90deg,#272219 0%,#3a3122 100%)' }}>
             <span className="text-lg">📋</span>
             <div>
               <p className="text-white font-black text-sm uppercase tracking-wide">Viso floto instrukcija</p>
@@ -602,10 +602,10 @@ export default function TripPlanner({ drivers, plans, cars = [], taskPoints = []
               <div key={veh.id} className="p-5 space-y-4">
                 <div className="flex items-center gap-3 flex-wrap">
                   <div className="w-5 h-5 rounded-full shrink-0" style={{ background: veh.color }} />
-                  <span className="font-black text-[#003087]">🚐 {veh.number || `Transportas #${vi + 1}`}</span>
+                  <span className="font-black text-[#272219]">🚐 {veh.number || `Transportas #${vi + 1}`}</span>
                   <Badge>{veh.capacity} viet.</Badge>
                   {routeInfo[veh.id] && <>
-                    <span className="text-xs font-black text-[#003087]">📏 {routeInfo[veh.id]!.km} km</span>
+                    <span className="text-xs font-black text-[#272219]">📏 {routeInfo[veh.id]!.km} km</span>
                     <span className="text-xs text-slate-400">⏱ ~{routeInfo[veh.id]!.h} val.</span>
                   </>}
                   {veh.additionalWork && (
@@ -665,14 +665,14 @@ export default function TripPlanner({ drivers, plans, cars = [], taskPoints = []
                               <div className="w-7 h-7 rounded-full text-white text-xs font-black flex items-center justify-center shrink-0" style={{ background: drv ? veh.color : '#94a3b8' }}>{i + 1}</div>
                               <div className="flex-1 bg-slate-50 border border-hairline rounded-xl p-3 space-y-1.5">
                                 <div className="flex items-start justify-between gap-2 flex-wrap">
-                                  <p className="text-sm font-bold text-[#003087]">📍 {stop.city}</p>
-                                  {replacesCar && <span className="font-mono text-xs font-black bg-[#003087] text-white px-2 py-0.5 rounded">{replacesCar}</span>}
+                                  <p className="text-sm font-bold text-[#272219]">📍 {stop.city}</p>
+                                  {replacesCar && <span className="font-mono text-xs font-black bg-[#272219] text-white px-2 py-0.5 rounded">{replacesCar}</span>}
                                 </div>
                                 <p className="text-xs font-mono text-slate-400">{stop.lat.toFixed(4)}, {stop.lng.toFixed(4)}</p>
                                 <div className="border-t border-hairline pt-1.5 space-y-1">
                                   <div className="flex items-center gap-2 text-xs">
                                     <span className="text-emerald-600 font-bold">↓ Išlipa:</span>
-                                    <span className={cn('font-semibold', drv ? 'text-[#003087]' : 'text-slate-400 italic')}>{drv ? drv.name : 'nepriskirta'}</span>
+                                    <span className={cn('font-semibold', drv ? 'text-[#272219]' : 'text-slate-400 italic')}>{drv ? drv.name : 'nepriskirta'}</span>
                                     {drv && <Badge>{drv.companyType}</Badge>}
                                   </div>
                                   {replaces && (
@@ -714,7 +714,7 @@ export default function TripPlanner({ drivers, plans, cars = [], taskPoints = []
 
       {/* Pending task modal */}
       {pendingTaskStop && (
-        <div className="fixed inset-0 bg-[#003087]/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+        <div className="fixed inset-0 bg-[#272219]/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
           onClick={(e) => e.target === e.currentTarget && setPendingTaskStop(null)}>
           <div className="bg-surface w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden border border-amber-200">
             <div className="px-5 py-4 flex items-center gap-3 bg-amber-500">

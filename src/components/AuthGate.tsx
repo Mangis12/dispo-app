@@ -3,8 +3,9 @@
 
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { Truck, LogIn } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 import { supabase, isSupabaseEnabled } from '../lib/supabase';
+import { VestexLogo } from './logo';
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   // Offline režimu (Supabase neįjungtas) autentifikacijos nereikia.
@@ -49,24 +50,20 @@ function SupabaseAuthGate({ children }: { children: React.ReactNode }) {
   if (session) return <>{children}</>;
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center p-4 font-sans text-ink overflow-hidden">
-      {/* Reali kinematografinė nuotrauka su lėtu „Ken Burns" priartinimu (Etihad dvasia) */}
-      <div className="absolute inset-0 overflow-hidden">
-        <img src="/img/truck-eu.jpg" alt="" className="w-full h-full object-cover kenburns" />
+    <div className="relative min-h-screen flex items-center justify-center p-4 font-sans text-ink overflow-hidden bg-gradient-to-br from-surface via-canvas to-[#dde8f3]">
+      {/* DAF XF — visa mašina matoma (be apkarpymo), dešinėje pusėje */}
+      <div className="absolute inset-y-0 right-0 w-full lg:w-3/4 pointer-events-none">
+        <img src="/img/daf-xf.jpg" alt="DAF XF" className="absolute bottom-0 right-0 h-[62%] sm:h-[78%] w-auto max-w-full object-contain object-right-bottom opacity-95" />
       </div>
-      {/* Firminis perdažymas — šiltas auksinis tonas + kremas legibilumui */}
-      <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/55 to-ink/30" />
-      <div className="absolute inset-0 mix-blend-multiply bg-[#9C7B36]/15" />
+      <div className="absolute inset-0 bg-gradient-to-r from-canvas via-canvas/70 to-transparent" />
 
-      <form onSubmit={signIn} className="relative reveal bg-surface/80 backdrop-blur-2xl w-full max-w-sm rounded-3xl shadow-float border border-white/60 ring-1 ring-gold/15 p-8 space-y-6">
+      <form onSubmit={signIn} className="relative reveal bg-surface/85 backdrop-blur-2xl w-full max-w-sm rounded-3xl shadow-float border border-white/70 ring-1 ring-gold/15 p-8 space-y-6">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 bg-ink rounded-2xl flex items-center justify-center ring-1 ring-gold/30">
-            <Truck className="text-gold-soft w-6 h-6" />
-          </div>
+          <VestexLogo />
           <div className="text-center">
-            <p className="text-2xl font-display font-medium tracking-tight">Dispečeris</p>
-            <div className="mx-auto mt-1.5 mb-0.5 h-px w-8 bg-gold/50" />
-            <p className="text-xs text-muted">Prisijunkite, kad tęstumėte</p>
+            <div className="mx-auto mb-1.5 h-px w-8 bg-gold/50" />
+            <p className="text-lg font-display font-medium tracking-tight">Dispečeris</p>
+            <p className="text-xs text-muted mt-0.5">Prisijunkite, kad tęstumėte</p>
           </div>
         </div>
 

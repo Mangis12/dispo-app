@@ -224,6 +224,25 @@ export function SprinterVan({ className, stroke = GOLD, style }: { className?: s
   );
 }
 
+// ── Furgono SILUETAS (užpildytas) — Mercedes Sprinter tipo (aukštas kėbulas) ──
+export function VanSilhouette({ className, fill = GOLD, style }: { className?: string; fill?: string; style?: CSSProperties }) {
+  return (
+    <svg viewBox="0 0 220 120" fill="none" className={className} style={style}>
+      {/* Aukštas uždaras kėbulas: trumpa nosis priekyje, vientisa „dėžė" iki galo */}
+      <path fill={fill} d="M14 96 V44 q0-8 8-10 l30-6 q5-1 9 2 l14 11 q3 2 7 2 H196 q10 0 10 10 V96 q0 4-4 4 h-12 a17 17 0 0 0-34 0 H72 a17 17 0 0 0-34 0 H18 q-4 0-4-4 Z" />
+      {/* Priekinis stiklas + šoninis langas (iškirpti) */}
+      <path fill="#FBF8F2" fillOpacity="0.92" d="M58 40 l13 10 H58 z" />
+      <rect x="78" y="40" width="22" height="12" rx="2" fill="#FBF8F2" fillOpacity="0.9" />
+      <rect x="106" y="40" width="22" height="12" rx="2" fill="#FBF8F2" fillOpacity="0.55" />
+      {/* Durų linija gale */}
+      <line x1="150" y1="44" x2="150" y2="80" stroke="#1c1710" strokeOpacity="0.25" strokeWidth="2" />
+      {/* Ratai */}
+      <circle cx="55" cy="96" r="14" fill="#1c1710" /><circle cx="55" cy="96" r="5.5" fill={fill} />
+      <circle cx="175" cy="96" r="14" fill="#1c1710" /><circle cx="175" cy="96" r="5.5" fill={fill} />
+    </svg>
+  );
+}
+
 export function EmptyChecklist({ className, label }: { className?: string; label?: string }) {
   return (
     <div className={className}>
