@@ -18,7 +18,7 @@ import { supabase, isSupabaseEnabled } from './lib/supabase';
 import { loadAll, syncCollection, subscribeAll, type AllData } from './lib/repo';
 import TripPlanner from './components/TripPlanner';
 import CoordinatorBoard from './components/CoordinatorBoard';
-import { EmptyRoad, EmptyChecklist, SemiTruck, RouteMark, EuropeMap, VanSilhouette } from './components/illustrations';
+import { EmptyRoad, EmptyChecklist, SemiTruck, EuropeMap } from './components/illustrations';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
   ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment, TaskPoint, CalendarNote
@@ -1485,8 +1485,7 @@ export default function App() {
         {/* ══════════════════ KELIONĖ (žemėlapis) ══════════════════ */}
         {activeTab === 'trip' && (
           <div className="space-y-5">
-            <PageBanner h="xtall" bg={<EuropeMap className="w-full h-full opacity-80" />}
-              art={<VanSilhouette className="w-52 lg:w-64 h-auto opacity-95 drop-shadow-lg" fill="#EDE2C9" />}
+            <PageBanner h="xtall" bg={<EuropeMap className="w-full h-full opacity-90" />}
               eyebrow="Logistika" title="Keitimo kelionės planavimas" subtitle="Mikroautobusai, maršrutai ir užduotys viename žemėlapyje" />
             <TripPlanner drivers={drivers} plans={plans} cars={cars} taskPoints={taskPoints} onConsumeTask={(id) => updateTaskPoint(id, { active: false })} showToast={(msg, type) => setToast({ message: msg, type: type ?? 'success' })} />
           </div>
@@ -1874,15 +1873,14 @@ function PageBanner({ img, bg, art, eyebrow, title, subtitle, h = 'tall' }: {
 }) {
   return (
     <div className={cn("relative overflow-hidden rounded-2xl border border-hairline shadow-card bg-ink", h === 'xtall' ? "h-36 sm:h-44" : "h-28 sm:h-32")}>
-      {bg ? <div className="absolute inset-0">{bg}</div> : <img src={img} alt="" className="absolute inset-0 w-full h-full object-cover kenburns" />}
-      <div className="absolute inset-0 bg-gradient-to-r from-ink/90 via-ink/55 to-ink/10" />
+      {/* Fonas (žemėlapis) — dešinėje pusėje, telpa visas (meet, neapkarpomas) */}
+      {bg
+        ? <div className="absolute inset-y-0 right-0 w-full sm:w-[60%]">{bg}</div>
+        : <img src={img} alt="" className="absolute inset-0 w-full h-full object-cover kenburns" />}
+      <div className={cn("absolute inset-0 bg-gradient-to-r", bg ? "from-ink via-ink/80 sm:via-ink/55 to-ink/20 sm:to-transparent" : "from-ink/90 via-ink/55 to-ink/10")} />
       {!bg && <div className="absolute inset-0 mix-blend-multiply bg-[#9C7B36]/10" />}
-      {art ? (
-        <div className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 hidden sm:block pointer-events-none">{art}</div>
-      ) : (
-        <RouteMark className="absolute right-4 top-1/2 -translate-y-1/2 w-20 h-20 opacity-30 hidden sm:block" stroke="#EDE2C9" />
-      )}
-      <div className="relative h-full flex flex-col justify-center px-5 sm:px-7 text-white max-w-lg">
+      {art && <div className="absolute right-3 bottom-2.5 hidden lg:block pointer-events-none">{art}</div>}
+      <div className="relative h-full flex flex-col justify-center px-5 sm:px-7 text-white max-w-md">
         <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-soft drop-shadow">{eyebrow}</p>
         <h2 className="font-display text-xl sm:text-2xl font-medium tracking-tight mt-0.5 drop-shadow-sm">{title}</h2>
         <p className="text-xs text-white/80 mt-1 hidden sm:block">{subtitle}</p>

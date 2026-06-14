@@ -165,7 +165,7 @@ export function EuropeMap({ className, style }: { className?: string; style?: CS
     return `M${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
   };
   return (
-    <svg viewBox="0 0 800 460" fill="none" className={className} style={style} preserveAspectRatio="xMidYMid slice">
+    <svg viewBox="0 0 800 460" fill="none" className={className} style={style} preserveAspectRatio="xMidYMid meet">
       {/* Graticule — žemėlapio tinklelis */}
       <g stroke={GOLD_SOFT} strokeWidth="0.6" opacity="0.18">
         {[60, 130, 200, 270, 340, 410].map((y) => <path key={y} d={`M0 ${y} Q 400 ${y - 22} 800 ${y}`} />)}
