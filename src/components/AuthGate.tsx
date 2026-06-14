@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { LogIn } from 'lucide-react';
 import { supabase, isSupabaseEnabled } from '../lib/supabase';
-import { VestexLogo } from './logo';
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   // Offline režimu (Supabase neįjungtas) autentifikacijos nereikia.
@@ -59,11 +58,13 @@ function SupabaseAuthGate({ children }: { children: React.ReactNode }) {
 
       <form onSubmit={signIn} className="relative reveal bg-surface/85 backdrop-blur-2xl w-full max-w-sm rounded-3xl shadow-float border border-white/70 ring-1 ring-gold/15 p-8 space-y-6">
         <div className="flex flex-col items-center gap-3">
-          <VestexLogo />
+          <div className="w-12 h-12 rounded-2xl bg-ink flex items-center justify-center ring-1 ring-gold/30">
+            <span className="font-display text-gold-soft text-2xl leading-none">D</span>
+          </div>
           <div className="text-center">
-            <div className="mx-auto mb-1.5 h-px w-8 bg-gold/50" />
-            <p className="text-lg font-display font-medium tracking-tight">Dispečeris</p>
-            <p className="text-xs text-muted mt-0.5">Prisijunkite, kad tęstumėte</p>
+            <p className="text-2xl font-display font-medium tracking-tight">Dispečeris</p>
+            <div className="mx-auto mt-1.5 mb-0.5 h-px w-8 bg-gold/50" />
+            <p className="text-xs text-muted">Vestex Transport · prisijunkite</p>
           </div>
         </div>
 

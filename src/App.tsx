@@ -19,7 +19,6 @@ import { loadAll, syncCollection, subscribeAll, type AllData } from './lib/repo'
 import TripPlanner from './components/TripPlanner';
 import CoordinatorBoard from './components/CoordinatorBoard';
 import { EmptyRoad, EmptyChecklist, SemiTruck, RouteMark, EuropeMap, VanSilhouette } from './components/illustrations';
-import { VestexLogo } from './components/logo';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
   ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment, TaskPoint, CalendarNote
@@ -736,7 +735,13 @@ export default function App() {
         sidebarOpen ? "translate-x-0 shadow-float" : "-translate-x-full"
       )}>
         <div className="flex items-center gap-2.5 px-5 h-16 shrink-0 border-b border-hairline/60">
-          <VestexLogo />
+          <div className="w-9 h-9 rounded-2xl bg-ink flex items-center justify-center ring-1 ring-gold/30 shrink-0">
+            <span className="font-display text-gold-soft text-lg leading-none">D</span>
+          </div>
+          <div>
+            <p className="text-[17px] font-display font-medium tracking-tight leading-none">Dispečeris</p>
+            <p className="text-[10px] text-muted tracking-[0.12em] uppercase mt-1">Vestex Transport</p>
+          </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
