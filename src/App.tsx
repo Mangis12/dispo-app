@@ -3,7 +3,7 @@ import {
   Users, Truck, Home, Calendar, Plus, ArrowRightLeft, ArrowRight,
   AlertCircle, UserPlus, LogOut, LogIn, X, Edit, History,
   CheckCircle2, User, Trash2, ChevronLeft, ChevronRight,
-  LayoutDashboard, Database, Wifi, WifiOff, Bell, Map as MapIcon, MapPin, Menu, Search, Mail, Undo2
+  LayoutDashboard, Database, Wifi, WifiOff, Bell, Map as MapIcon, MapPin, Menu, Search, Mail, Undo2, StickyNote
 } from 'lucide-react';
 import {
   format, differenceInDays, parseISO, isBefore, isAfter,
@@ -18,10 +18,10 @@ import { supabase, isSupabaseEnabled } from './lib/supabase';
 import { loadAll, syncCollection, subscribeAll, type AllData } from './lib/repo';
 import TripPlanner from './components/TripPlanner';
 import CoordinatorBoard from './components/CoordinatorBoard';
-import { EmptyRoad, EmptyChecklist, SemiTruck, RouteMark } from './components/illustrations';
+import { EmptyRoad, EmptyChecklist, SemiTruck, RouteMark, EuropeMap, SprinterVan } from './components/illustrations';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
-  ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment, TaskPoint
+  ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment, TaskPoint, CalendarNote
 } from './types';
 
 function cn(...inputs: ClassValue[]) {
@@ -45,22 +45,28 @@ const INITIAL_CARS: Car[] = [
 type Tab = 'dashboard' | 'planning' | 'drivers' | 'cars' | 'history' | 'calendar' | 'auto-grafikas' | 'trip' | 'coordinator';
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
-function StatCard({ label, value, sub, accent, onClick }: { label: string; value: number | string; sub?: string; accent?: string; onClick?: () => void }) {
+function StatCard({ label, value, sub, accent, onClick, art }: { label: string; value: number | string; sub?: string; accent?: string; onClick?: () => void; art?: React.ReactNode }) {
   const Tag = onClick ? 'button' : 'div';
   return (
     <Tag
       onClick={onClick}
       className={cn(
-        "text-left rounded-2xl p-6 bg-surface border border-hairline shadow-card transition-all",
+        "group/stat relative overflow-hidden text-left rounded-2xl p-6 bg-surface border border-hairline shadow-card transition-all",
         onClick && "hover:border-ink/25 hover:-translate-y-0.5 cursor-pointer"
       )}
     >
-      <div className="flex items-center gap-2 mb-3">
+      {/* Teminė line-art detalė kampe */}
+      {art && (
+        <div className="absolute -right-3 -bottom-3 text-ink/[0.06] group-hover/stat:text-gold/25 transition-colors duration-300 pointer-events-none">
+          {art}
+        </div>
+      )}
+      <div className="relative flex items-center gap-2 mb-3">
         <span className={cn("w-1.5 h-1.5 rounded-full", accent ?? "bg-stone-300")} />
         <p className="text-[11px] font-medium uppercase tracking-wider text-muted">{label}</p>
       </div>
-      <p className="text-[2.25rem] leading-none font-display font-medium tracking-tight text-ink">{value}</p>
-      {sub && <p className="text-xs text-muted mt-2.5">{sub}</p>}
+      <p className="relative text-[2.25rem] leading-none font-display font-medium tracking-tight text-ink">{value}</p>
+      {sub && <p className="relative text-xs text-muted mt-2.5">{sub}</p>}
     </Tag>
   );
 }
@@ -170,9 +176,10 @@ export default function App() {
   const [plans, setPlans]               = useState<ReplacementPlan[]>([]);
   const [carAssignments, setCarAssignments] = useState<CarAssignment[]>([]);
   const [taskPoints, setTaskPoints]     = useState<TaskPoint[]>([]);
+  const [calendarNotes, setCalendarNotes] = useState<CalendarNote[]>([]);
   const [loaded, setLoaded]             = useState(false);
   // Paskutinė su saugykla suderinta būsena — naudojama syncCollection diff'ui.
-  const prevSnap = useRef<AllData>({ drivers: [], cars: [], history: [], plans: [], carAssignments: [], taskPoints: [] });
+  const prevSnap = useRef<AllData>({ drivers: [], cars: [], history: [], plans: [], carAssignments: [], taskPoints: [], calendarNotes: [] });
 
   const [activeTab, setActiveTab]       = useState<Tab>('dashboard');
   const [sidebarOpen, setSidebarOpen]   = useState(false);
@@ -227,7 +234,7 @@ export default function App() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await loadAll({ drivers: INITIAL_DRIVERS, cars: INITIAL_CARS, history: [], plans: [], carAssignments: [], taskPoints: [] });
+        const data = await loadAll({ drivers: INITIAL_DRIVERS, cars: INITIAL_CARS, history: [], plans: [], carAssignments: [], taskPoints: [], calendarNotes: [] });
         if (cancelled) return;
         // Dedup planų ir, jei priskyrimų nėra — išvedame iš „Reise" vairuotojų.
         const dedupPlans = data.plans.filter((p, i, a) => i === a.findIndex(x => x.carNumber === p.carNumber && x.date === p.date && x.leavingDriverId === p.leavingDriverId && x.incomingDriverId === p.incomingDriverId));
@@ -240,13 +247,14 @@ export default function App() {
           }));
         }
         // prevSnap = neapdorota įkelta būsena; skirtumai (dedup/išvesti priskyrimai) įsirašys per sync.
-        prevSnap.current = { drivers: data.drivers, cars: data.cars, history: data.history, plans: data.plans, carAssignments: data.carAssignments, taskPoints: data.taskPoints };
+        prevSnap.current = { drivers: data.drivers, cars: data.cars, history: data.history, plans: data.plans, carAssignments: data.carAssignments, taskPoints: data.taskPoints, calendarNotes: data.calendarNotes };
         setDrivers(data.drivers);
         setCars(data.cars);
         setHistory(data.history);
         setPlans(dedupPlans);
         setCarAssignments(assignments);
         setTaskPoints(data.taskPoints);
+        setCalendarNotes(data.calendarNotes);
       } catch (e) {
         if (!cancelled) setToast({ message: e instanceof Error ? e.message : 'Klaida kraunant duomenis', type: 'error' });
       } finally {
@@ -268,14 +276,15 @@ export default function App() {
           await syncCollection('plans', prevSnap.current.plans, plans);
           await syncCollection('carAssignments', prevSnap.current.carAssignments, carAssignments);
           await syncCollection('taskPoints', prevSnap.current.taskPoints, taskPoints);
-          prevSnap.current = { drivers, cars, history, plans, carAssignments, taskPoints };
+          await syncCollection('calendarNotes', prevSnap.current.calendarNotes, calendarNotes);
+          prevSnap.current = { drivers, cars, history, plans, carAssignments, taskPoints, calendarNotes };
         } catch (e) {
           setToast({ message: e instanceof Error ? e.message : 'Sinchronizacijos klaida', type: 'error' });
         }
       })();
     }, 400);
     return () => clearTimeout(id);
-  }, [drivers, cars, history, plans, carAssignments, taskPoints, loaded]);
+  }, [drivers, cars, history, plans, carAssignments, taskPoints, calendarNotes, loaded]);
 
   // ── Realaus laiko prenumerata (kitų vartotojų pakeitimai) ────────────────────
   useEffect(() => {
@@ -287,6 +296,7 @@ export default function App() {
       plans:          (rows) => { prevSnap.current.plans = rows;          setPlans(rows); },
       carAssignments: (rows) => { prevSnap.current.carAssignments = rows; setCarAssignments(rows); },
       taskPoints:     (rows) => { prevSnap.current.taskPoints = rows;     setTaskPoints(rows); },
+      calendarNotes:  (rows) => { prevSnap.current.calendarNotes = rows;  setCalendarNotes(rows); },
     });
   }, [loaded]);
 
@@ -581,6 +591,16 @@ export default function App() {
     setPlans(prev => prev.map(p => p.id === planId ? { ...p, changeTask: task || null } : p));
   };
 
+  // ── Kalendoriaus pastabos (viena diena = viena pastaba) ──
+  const setDayNote = (date: string, text: string) => {
+    setCalendarNotes(prev => {
+      const exists = prev.find(n => n.date === date);
+      if (!text.trim()) return prev.filter(n => n.date !== date);
+      if (exists) return prev.map(n => n.date === date ? { ...n, text } : n);
+      return [...prev, { id: `note-${date}`, date, text }];
+    });
+  };
+
   // ── Koordinatoriaus papildomos užduotys (task points) ──
   const addTaskPoint = (t: Omit<TaskPoint, 'id'>) => {
     const id = uid();
@@ -795,7 +815,7 @@ export default function App() {
           <div className="space-y-8">
             {/* Hero juosta — reali nuotrauka + Ken Burns, premium (Etihad dvasia) */}
             <div className="relative overflow-hidden rounded-3xl border border-hairline shadow-card h-44 sm:h-52">
-              <img src="/img/hero-dusk.jpg" alt="" className="absolute inset-0 w-full h-full object-cover kenburns" />
+              <img src="/img/truck-eu.jpg" alt="" className="absolute inset-0 w-full h-full object-cover kenburns" />
               <div className="absolute inset-0 bg-gradient-to-r from-ink/80 via-ink/45 to-transparent" />
               <div className="absolute inset-0 mix-blend-multiply bg-[#9C7B36]/10" />
               <div className="relative h-full flex flex-col justify-center px-6 sm:px-9 max-w-xl text-white">
@@ -812,10 +832,10 @@ export default function App() {
 
             {/* Stats Row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <StatCard label="Reise"        value={reiseDrivers.length}   sub={`iš ${drivers.length} viso`}          accent="bg-blue-400"    onClick={() => setActiveTab('drivers')} />
-              <StatCard label="Namuose"      value={namuoseDrivers.length} sub="laukia darbo"                          accent="bg-emerald-400" onClick={() => setActiveTab('drivers')} />
-              <StatCard label="Planai"       value={activePlans.length}    sub="suplanuota"                            accent="bg-violet-400"  onClick={() => setActiveTab('planning')} />
-              <StatCard label="Skubu"        value={urgentCount}           sub="reikia keitimo ≤7d"                   accent={urgentCount > 0 ? "bg-red-400" : "bg-stone-300"} onClick={() => setActiveTab('planning')} />
+              <StatCard label="Reise"        value={reiseDrivers.length}   sub={`iš ${drivers.length} viso`}          accent="bg-blue-400"    onClick={() => setActiveTab('drivers')} art={<SemiTruck className="w-28 h-auto" stroke="currentColor" />} />
+              <StatCard label="Namuose"      value={namuoseDrivers.length} sub="laukia darbo"                          accent="bg-emerald-400" onClick={() => setActiveTab('drivers')} art={<Home size={92} strokeWidth={1.2} />} />
+              <StatCard label="Planai"       value={activePlans.length}    sub="suplanuota"                            accent="bg-violet-400"  onClick={() => setActiveTab('planning')} art={<ArrowRightLeft size={88} strokeWidth={1.1} />} />
+              <StatCard label="Skubu"        value={urgentCount}           sub="reikia keitimo ≤7d"                   accent={urgentCount > 0 ? "bg-red-400" : "bg-stone-300"} onClick={() => setActiveTab('planning')} art={<AlertCircle size={88} strokeWidth={1.1} />} />
             </div>
 
             {/* Planned Replacements */}
@@ -1411,9 +1431,13 @@ export default function App() {
                     const dp   = plans.filter(p => p.date === ds);
                     const curr = isSameMonth(day, selectedMonth);
                     const tod  = isSameDay(day, new Date());
+                    const note = calendarNotes.find(n => n.date === ds);
                     return (
-                      <div key={i} onClick={() => dp.length > 0 && setSelectedCalendarDay(ds)} className={cn("min-h-[100px] p-2 border-r border-b border-hairline transition-colors", !curr && "bg-canvas opacity-40", tod && "bg-blue-50", dp.length > 0 && "cursor-pointer hover:bg-canvas")}>
-                        <span className={cn("text-[10px] font-bold w-6 h-6 flex items-center justify-center rounded-full", tod ? "bg-ink text-white" : "text-stone-400")}>{format(day, 'd')}</span>
+                      <div key={i} onClick={() => setSelectedCalendarDay(ds)} className={cn("group/day relative min-h-[100px] p-2 border-r border-b border-hairline transition-colors cursor-pointer hover:bg-canvas", !curr && "bg-canvas opacity-40", tod && "bg-blue-50")}>
+                        <div className="flex items-center justify-between">
+                          <span className={cn("text-[10px] font-bold w-6 h-6 flex items-center justify-center rounded-full", tod ? "bg-ink text-white" : "text-stone-400")}>{format(day, 'd')}</span>
+                          {note && <span title={note.text} className="text-gold"><StickyNote size={11} /></span>}
+                        </div>
                         <div className="mt-1 space-y-1">
                           {dp.slice(0, 3).map(p => (
                             <div key={p.id} className={cn("text-[8px] px-1.5 py-0.5 rounded font-bold truncate", p.status === 'Suplanuota' ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700")}>
@@ -1444,7 +1468,7 @@ export default function App() {
         {/* ══════════════════ KOORDINATORIUS (keitimo taškai) ══════════════════ */}
         {activeTab === 'coordinator' && (
           <div className="space-y-5">
-            <PageBanner img="/img/road-mountain.jpg" eyebrow="Koordinavimas" title="Keitimo taškai ir užduotys" subtitle="Pažymėkite, kur įvyks pamaina — viskas atkeliaus į Kelionę" />
+            <PageBanner h="xtall" bg={<EuropeMap className="w-full h-full opacity-90" />} eyebrow="Koordinavimas" title="Keitimo taškai Europoje" subtitle="Pažymėkite, kur įvyks pamaina — taškai keliauja į Kelionę" />
             <CoordinatorBoard
               plans={plans} cars={cars} drivers={drivers} taskPoints={taskPoints}
               onSetPoint={setPlanChangePoint} onClearPoint={clearPlanChangePoint} onSetPlanTask={setPlanChangeTask}
@@ -1457,7 +1481,9 @@ export default function App() {
         {/* ══════════════════ KELIONĖ (žemėlapis) ══════════════════ */}
         {activeTab === 'trip' && (
           <div className="space-y-5">
-            <PageBanner img="/img/truck-highway.jpg" eyebrow="Logistika" title="Keitimo kelionės planavimas" subtitle="Maršrutai, sustojimai ir papildomos užduotys viename žemėlapyje" />
+            <PageBanner h="xtall" bg={<EuropeMap className="w-full h-full opacity-80" />}
+              art={<SprinterVan className="w-56 lg:w-72 h-auto opacity-90" stroke="#EDE2C9" />}
+              eyebrow="Logistika" title="Keitimo kelionės planavimas" subtitle="Mikroautobusai, maršrutai ir užduotys viename žemėlapyje" />
             <TripPlanner drivers={drivers} plans={plans} cars={cars} taskPoints={taskPoints} onConsumeTask={(id) => updateTaskPoint(id, { active: false })} showToast={(msg, type) => setToast({ message: msg, type: type ?? 'success' })} />
           </div>
         )}
@@ -1573,38 +1599,109 @@ export default function App() {
       )}
 
       {/* Calendar Day Detail */}
-      {selectedCalendarDay && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-surface w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 bg-ink text-white flex items-center justify-between">
-              <div>
-                <p className="font-bold">{format(parseISO(selectedCalendarDay), 'yyyy MMMM d', { locale: lt })}</p>
-                <p className="text-[10px] text-stone-400 uppercase tracking-wider">Dienos planai</p>
+      {selectedCalendarDay && (() => {
+        const sel = parseISO(selectedCalendarDay);
+        const wStart = startOfWeek(sel, { weekStartsOn: 1 });
+        const wEnd = endOfWeek(sel, { weekStartsOn: 1 });
+        const weekDays = eachDayOfInterval({ start: wStart, end: wEnd });
+        const weekPlans = plans.filter(p => { const d = parseISO(p.date); return !isBefore(d, wStart) && !isAfter(d, wEnd); });
+        const note = calendarNotes.find(n => n.date === selectedCalendarDay);
+        return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in" onClick={(e) => e.target === e.currentTarget && setSelectedCalendarDay(null)}>
+          <div className="bg-surface w-full max-w-xl rounded-3xl shadow-float overflow-hidden">
+            {/* Antraštė su savaitės juosta */}
+            <div className="px-6 py-4 bg-ink text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-display text-lg font-medium capitalize">{format(sel, 'EEEE, MMMM d', { locale: lt })}</p>
+                  <p className="text-[10px] text-gold-soft uppercase tracking-[0.18em] mt-0.5">Savaitė {format(wStart, 'MM.dd')}–{format(wEnd, 'MM.dd')} · {weekPlans.length} keitimai</p>
+                </div>
+                <button onClick={() => setSelectedCalendarDay(null)} className="p-1.5 hover:bg-white/10 rounded-lg"><X size={16}/></button>
               </div>
-              <button onClick={() => setSelectedCalendarDay(null)} className="p-1.5 hover:bg-surface/10 rounded-lg"><X size={16}/></button>
+              <div className="grid grid-cols-7 gap-1 mt-3">
+                {weekDays.map(d => {
+                  const ds = format(d, 'yyyy-MM-dd');
+                  const cnt = plans.filter(p => p.date === ds).length;
+                  const isSel = ds === selectedCalendarDay;
+                  return (
+                    <button key={ds} onClick={() => setSelectedCalendarDay(ds)} className={cn("rounded-lg py-1.5 text-center transition-all", isSel ? "bg-gold text-ink" : "bg-white/5 hover:bg-white/10")}>
+                      <div className="text-[8px] uppercase opacity-70">{format(d, 'EEEEEE', { locale: lt })}</div>
+                      <div className="text-sm font-semibold leading-tight">{format(d, 'd')}</div>
+                      <div className={cn("text-[8px] font-bold leading-none", cnt > 0 ? (isSel ? "text-ink/70" : "text-gold-soft") : "opacity-0")}>{cnt || '·'}</div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
-              {plans.filter(p => p.date === selectedCalendarDay).map(plan => (
-                <div key={plan.id} className="border border-hairline rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="font-mono font-black bg-ink text-white px-2 py-0.5 rounded text-sm">{plan.carNumber}</span>
-                    <Badge variant={plan.status === 'Suplanuota' ? 'blue' : 'green'}>{plan.status}</Badge>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <div><p className="text-[9px] text-red-500 font-bold uppercase mb-0.5">Namo</p><p className="font-semibold text-sm">{plan.leavingDriverName}</p></div>
-                    <ArrowRight size={16} className="text-stone-300 shrink-0"/>
-                    <div className="text-right"><p className="text-[9px] text-emerald-500 font-bold uppercase mb-0.5">Į reisą</p><p className="font-semibold text-sm">{plan.incomingDriverName}</p></div>
+
+            <div className="p-6 space-y-5 max-h-[55vh] overflow-y-auto">
+              {/* Pasirinktos dienos keitimai */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">Šios dienos keitimai</p>
+                <div className="space-y-2">
+                  {plans.filter(p => p.date === selectedCalendarDay).map(plan => {
+                    const car = cars.find(c => c.number === plan.carNumber);
+                    return (
+                      <div key={plan.id} className="border border-hairline rounded-xl p-3.5">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-mono font-bold bg-ink text-white px-2 py-0.5 rounded text-xs">{plan.carNumber}</span>
+                          <div className="flex items-center gap-1.5">
+                            {car && <Badge variant="blue">{car.type}</Badge>}
+                            <Badge variant={plan.status === 'Suplanuota' ? 'blue' : 'green'}>{plan.status}</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <div><p className="text-[9px] text-red-500 font-bold uppercase mb-0.5">Namo</p><p className="font-semibold text-sm">{plan.leavingDriverName}</p></div>
+                          <ArrowRight size={16} className="text-stone-300 shrink-0"/>
+                          <div className="text-right"><p className="text-[9px] text-emerald-500 font-bold uppercase mb-0.5">Į reisą</p><p className="font-semibold text-sm">{plan.incomingDriverName}</p></div>
+                        </div>
+                        {plan.changeLocation && <p className="text-[11px] text-muted mt-2 pt-2 border-t border-hairline">📍 {plan.changeLocation}{plan.changeTask ? ` · 📦 ${plan.changeTask}` : ''}</p>}
+                      </div>
+                    );
+                  })}
+                  {plans.filter(p => p.date === selectedCalendarDay).length === 0 && <p className="text-stone-400 text-sm py-3 text-center bg-canvas rounded-xl">Šią dieną keitimų nėra</p>}
+                </div>
+              </div>
+
+              {/* Visos savaitės santrauka */}
+              {weekPlans.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">Visa savaitė</p>
+                  <div className="space-y-1">
+                    {weekPlans.sort((a, b) => a.date.localeCompare(b.date)).map(p => (
+                      <button key={p.id} onClick={() => setSelectedCalendarDay(p.date)} className={cn("w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg transition-colors text-xs", p.date === selectedCalendarDay ? "bg-gold/10" : "hover:bg-canvas")}>
+                        <span className="font-mono text-[10px] text-muted w-12 shrink-0">{format(parseISO(p.date), 'MM.dd')}</span>
+                        <span className="font-mono font-semibold bg-ink/[0.07] px-1.5 py-0.5 rounded shrink-0">{p.carNumber}</span>
+                        <span className="truncate">{p.leavingDriverName} → <b className="font-semibold">{p.incomingDriverName}</b></span>
+                        <span className={cn("ml-auto w-1.5 h-1.5 rounded-full shrink-0", p.status === 'Suplanuota' ? "bg-blue-400" : "bg-emerald-400")} />
+                      </button>
+                    ))}
                   </div>
                 </div>
-              ))}
-              {plans.filter(p => p.date === selectedCalendarDay).length === 0 && <p className="text-center text-stone-400 text-sm py-8">Planų nėra</p>}
+              )}
+
+              {/* Pastaba dienai */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2 flex items-center gap-1.5"><StickyNote size={12} className="text-gold" /> Pastaba šiai dienai</p>
+                <textarea
+                  defaultValue={note?.text ?? ''}
+                  key={selectedCalendarDay}
+                  onBlur={(e) => { if ((e.target.value || '') !== (note?.text ?? '')) setDayNote(selectedCalendarDay, e.target.value); }}
+                  rows={3}
+                  placeholder="Užrašykite pastabą (pvz. patvirtinti su vairuotoju, dokumentai, sąlygos)…"
+                  className="w-full bg-canvas border border-hairline rounded-xl px-3.5 py-2.5 text-sm resize-none focus:outline-none focus:border-gold/60"
+                />
+                <p className="text-[10px] text-muted mt-1">Išsaugoma automatiškai (paspaudus šalia laukelio).</p>
+              </div>
             </div>
+
             <div className="px-6 py-4 border-t border-hairline">
-              <button onClick={() => setSelectedCalendarDay(null)} className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm">Uždaryti</button>
+              <button onClick={() => setSelectedCalendarDay(null)} className="w-full bg-ink text-white py-2.5 rounded-xl font-semibold text-sm hover:bg-ink/85 transition-colors">Uždaryti</button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Confirm Plan */}
       {confirmData && (
@@ -1764,14 +1861,23 @@ function MonthNav({ value, onChange }: { value: Date; onChange: (d: Date) => voi
   );
 }
 
-// Plona premium nuotraukos juosta skilties viršuje (Etihad dvasia) su route akcentu.
-function PageBanner({ img, eyebrow, title, subtitle }: { img: string; eyebrow: string; title: string; subtitle: string }) {
+// Plona premium juosta skilties viršuje (Etihad dvasia). `bg` — pasirinktinis
+// fonas (pvz. Europos žemėlapis); kitaip naudojama nuotrauka `img`. `art` —
+// dešinėje pusėje rodoma line-art detalė (pvz. mikroautobusas).
+function PageBanner({ img, bg, art, eyebrow, title, subtitle, h = 'tall' }: {
+  img?: string; bg?: React.ReactNode; art?: React.ReactNode;
+  eyebrow: string; title: string; subtitle: string; h?: 'tall' | 'xtall';
+}) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-hairline shadow-card h-28 sm:h-32">
-      <img src={img} alt="" className="absolute inset-0 w-full h-full object-cover kenburns" />
-      <div className="absolute inset-0 bg-gradient-to-r from-ink/85 via-ink/50 to-transparent" />
-      <div className="absolute inset-0 mix-blend-multiply bg-[#9C7B36]/10" />
-      <RouteMark className="absolute right-4 top-1/2 -translate-y-1/2 w-20 h-20 opacity-30 hidden sm:block" stroke="#EDE2C9" />
+    <div className={cn("relative overflow-hidden rounded-2xl border border-hairline shadow-card bg-ink", h === 'xtall' ? "h-36 sm:h-44" : "h-28 sm:h-32")}>
+      {bg ? <div className="absolute inset-0">{bg}</div> : <img src={img} alt="" className="absolute inset-0 w-full h-full object-cover kenburns" />}
+      <div className="absolute inset-0 bg-gradient-to-r from-ink/90 via-ink/55 to-ink/10" />
+      {!bg && <div className="absolute inset-0 mix-blend-multiply bg-[#9C7B36]/10" />}
+      {art ? (
+        <div className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 hidden sm:block pointer-events-none">{art}</div>
+      ) : (
+        <RouteMark className="absolute right-4 top-1/2 -translate-y-1/2 w-20 h-20 opacity-30 hidden sm:block" stroke="#EDE2C9" />
+      )}
       <div className="relative h-full flex flex-col justify-center px-5 sm:px-7 text-white max-w-lg">
         <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-gold-soft drop-shadow">{eyebrow}</p>
         <h2 className="font-display text-xl sm:text-2xl font-medium tracking-tight mt-0.5 drop-shadow-sm">{title}</h2>

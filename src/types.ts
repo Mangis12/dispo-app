@@ -58,6 +58,13 @@ export interface ReplacementPlan {
   changeTask?: string | null;
 }
 
+// Dispečerio pastaba kalendoriuje (viena diena = viena pastaba).
+export interface CalendarNote {
+  id: string;
+  date: string; // yyyy-MM-dd
+  text: string;
+}
+
 // Koordinatoriaus papildoma užduotis su vieta. Gali būti išsaugota (pasikartojanti)
 // daugkartiniam naudojimui. Aktyvios užduotys atkeliauja į Kelionės skiltį.
 export interface TaskPoint {

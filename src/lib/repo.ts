@@ -6,7 +6,7 @@
 import { supabase, isSupabaseEnabled } from './supabase';
 import { TABLES, type CollectionKey } from './mappers';
 import type {
-  Driver, Car, HistoryEntry, ReplacementPlan, CarAssignment, TaskPoint,
+  Driver, Car, HistoryEntry, ReplacementPlan, CarAssignment, TaskPoint, CalendarNote,
 } from '../types';
 
 export interface AllData {
@@ -16,6 +16,7 @@ export interface AllData {
   plans: ReplacementPlan[];
   carAssignments: CarAssignment[];
   taskPoints: TaskPoint[];
+  calendarNotes: CalendarNote[];
 }
 
 // localStorage raktai (suderinti su senąja App.tsx persistencija — duomenys nedingsta).
@@ -26,6 +27,7 @@ const LS_KEYS: Record<CollectionKey, string> = {
   plans: 'plans_data',
   carAssignments: 'car_assignments_data',
   taskPoints: 'task_points_data',
+  calendarNotes: 'calendar_notes_data',
 };
 
 const lsLoad = <T,>(key: string, fallback: T): T => {
@@ -48,6 +50,7 @@ export async function loadAll(defaults?: Partial<AllData>): Promise<AllData> {
       plans: lsLoad(LS_KEYS.plans, defaults?.plans ?? []),
       carAssignments: lsLoad(LS_KEYS.carAssignments, defaults?.carAssignments ?? []),
       taskPoints: lsLoad(LS_KEYS.taskPoints, defaults?.taskPoints ?? []),
+      calendarNotes: lsLoad(LS_KEYS.calendarNotes, defaults?.calendarNotes ?? []),
     };
   }
 

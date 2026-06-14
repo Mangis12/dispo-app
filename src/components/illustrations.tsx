@@ -136,6 +136,94 @@ export function EmptyRoad({ className, label }: { className?: string; label?: st
   );
 }
 
+// ── Europos maršrutų žemėlapis — miestai pasirodo taškais su jungiamomis dugomis
+// (oro linijų žemėlapio dvasia, premium). Bazė = Kaunas (auksinė).
+const EU_CITIES: { name: string; x: number; y: number; base?: boolean }[] = [
+  { name: 'Kaunas', x: 566, y: 150, base: true },
+  { name: 'Vilnius', x: 586, y: 162 },
+  { name: 'Ryga', x: 560, y: 116 },
+  { name: 'Tallinn', x: 575, y: 86 },
+  { name: 'Warszawa', x: 520, y: 188 },
+  { name: 'Berlin', x: 446, y: 196 },
+  { name: 'Amsterdam', x: 388, y: 176 },
+  { name: 'Praha', x: 462, y: 224 },
+  { name: 'Wien', x: 484, y: 248 },
+  { name: 'München', x: 430, y: 244 },
+  { name: 'Paris', x: 338, y: 232 },
+  { name: 'Milano', x: 420, y: 286 },
+  { name: 'Roma', x: 452, y: 332 },
+  { name: 'Barcelona', x: 322, y: 326 },
+  { name: 'Madrid', x: 250, y: 348 },
+];
+
+export function EuropeMap({ className, style }: { className?: string; style?: CSSProperties }) {
+  const base = EU_CITIES.find((c) => c.base)!;
+  const arc = (x1: number, y1: number, x2: number, y2: number) => {
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    const dx = x2 - x1, dy = y2 - y1;
+    const cx = mx - dy * 0.18, cy = my + dx * 0.18; // lenkimas
+    return `M${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
+  };
+  return (
+    <svg viewBox="0 0 800 460" fill="none" className={className} style={style} preserveAspectRatio="xMidYMid slice">
+      {/* Graticule — žemėlapio tinklelis */}
+      <g stroke={GOLD_SOFT} strokeWidth="0.6" opacity="0.18">
+        {[60, 130, 200, 270, 340, 410].map((y) => <path key={y} d={`M0 ${y} Q 400 ${y - 22} 800 ${y}`} />)}
+        {[120, 240, 360, 480, 600, 720].map((x) => <line key={x} x1={x} y1="0" x2={x} y2="460" />)}
+      </g>
+      {/* Maršrutų dugos iš bazės */}
+      {EU_CITIES.filter((c) => !c.base).map((c, i) => (
+        <path key={`a${c.name}`} className="map-arc" d={arc(base.x, base.y, c.x, c.y)}
+          stroke={GOLD_SOFT} strokeWidth="1.2" fill="none" strokeLinecap="round"
+          style={{ animationDelay: `${0.3 + i * 0.13}s, ${1.7 + i * 0.13}s` }} />
+      ))}
+      {/* Miestų taškai */}
+      {EU_CITIES.map((c, i) => (
+        <g key={c.name}>
+          {!c.base && (
+            <circle className="map-ring" cx={c.x} cy={c.y} r="5" fill="none" stroke={GOLD_SOFT} strokeWidth="1"
+              style={{ animationDelay: `${0.9 + i * 0.13}s` }} />
+          )}
+          <g className="map-pin" style={{ animationDelay: `${0.5 + i * 0.13}s` }}>
+            <circle cx={c.x} cy={c.y} r={c.base ? 5 : 3.2} fill={c.base ? GOLD : GOLD_SOFT} />
+            {c.base && <circle cx={c.x} cy={c.y} r="9" fill="none" stroke={GOLD} strokeWidth="1.4" />}
+            <text x={c.x + (c.x > 520 ? 9 : -9)} y={c.y + 3} fontSize="10.5"
+              textAnchor={c.x > 520 ? 'start' : 'end'} fill="#F3E9D2" fontWeight={c.base ? 700 : 500}
+              style={{ letterSpacing: '0.02em', paintOrder: 'stroke' }} stroke="#1c1710" strokeWidth="2.4">{c.name}</text>
+          </g>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// ── Mikroautobusas (Mercedes Sprinter tipo) — šoninis line-art ──────────────
+export function SprinterVan({ className, stroke = GOLD, style }: { className?: string; stroke?: string; style?: CSSProperties }) {
+  return (
+    <svg viewBox="0 0 200 110" fill="none" className={className} style={style}
+      stroke={stroke} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+      {/* Kėbulas — aukšta stoginė priekyje žemesnė */}
+      <path d="M14 82 V44 q0-6 6-7 l40-9 q6-1 11 3 l20 16 h74 q8 0 8 8 V82" />
+      {/* Priekinis stiklas + kapotas */}
+      <path d="M60 31 l18 16 H60 z" />
+      <path d="M60 47 V31" opacity="0.6" />
+      {/* Šoninės durys / langai */}
+      <path d="M96 47 h18 M120 47 h18 M144 47 h16" opacity="0.45" />
+      <line x1="92" y1="47" x2="92" y2="82" opacity="0.4" />
+      <line x1="166" y1="47" x2="166" y2="82" opacity="0.4" />
+      {/* Žibintas */}
+      <path d="M170 60 h8" />
+      {/* Slenkstis */}
+      <line x1="14" y1="82" x2="182" y2="82" />
+      {/* Ratai */}
+      <circle cx="50" cy="86" r="11" /><circle cx="50" cy="86" r="3.4" opacity="0.6" />
+      <circle cx="150" cy="86" r="11" /><circle cx="150" cy="86" r="3.4" opacity="0.6" />
+      {/* Kelias */}
+      <line x1="0" y1="98" x2="200" y2="98" opacity="0.3" />
+    </svg>
+  );
+}
+
 export function EmptyChecklist({ className, label }: { className?: string; label?: string }) {
   return (
     <div className={className}>

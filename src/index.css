@@ -111,3 +111,40 @@
   from { background-position: 200% 0; }
   to { background-position: -200% 0; }
 }
+
+/* Europos žemėlapio animacijos — miestų taškai pasirodo, maršrutai nubrėžiami */
+.map-pin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pinIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.map-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pinPulse 2.8s ease-out infinite;
+}
+.map-arc {
+  stroke-dasharray: 240;
+  stroke-dashoffset: 240;
+  animation: drawArc 1.4s ease-out both, arcGlow 3.5s ease-in-out infinite 1.4s;
+}
+@keyframes pinIn {
+  from { opacity: 0; transform: scale(0); }
+  60% { transform: scale(1.25); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes pinPulse {
+  0% { opacity: 0.5; transform: scale(0.6); }
+  70%, 100% { opacity: 0; transform: scale(2.4); }
+}
+@keyframes drawArc {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes arcGlow {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-pin, .map-ring, .map-arc { animation: none !important; stroke-dashoffset: 0 !important; opacity: 1 !important; }
+}

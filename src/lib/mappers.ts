@@ -3,7 +3,7 @@
 // tad jo nesiunčiame; from-row jį ignoruoja.
 
 import type {
-  Driver, Car, HistoryEntry, ReplacementPlan, CarAssignment, TaskPoint,
+  Driver, Car, HistoryEntry, ReplacementPlan, CarAssignment, TaskPoint, CalendarNote,
 } from '../types';
 
 type Row = Record<string, unknown>;
@@ -156,6 +156,10 @@ export const assignmentFromRow = (r: Row): CarAssignment => ({
   endDate: (r.end_date as string | null) ?? null,
 });
 
+// ── CalendarNote ─────────────────────────────────────────────────────────────
+export const noteToRow = (n: CalendarNote): Row => ({ id: n.id, date: n.date, text: n.text });
+export const noteFromRow = (r: Row): CalendarNote => ({ id: String(r.id), date: String(r.date ?? ''), text: String(r.text ?? '') });
+
 // ── Registras: lentelė ↔ konverteriai (naudoja repo.ts) ──────────────────────
 export const TABLES = {
   drivers:         { table: 'drivers',         toRow: driverToRow,     fromRow: driverFromRow },
@@ -164,6 +168,7 @@ export const TABLES = {
   plans:           { table: 'plans',           toRow: planToRow,       fromRow: planFromRow },
   carAssignments:  { table: 'car_assignments', toRow: assignmentToRow, fromRow: assignmentFromRow },
   taskPoints:      { table: 'task_points',     toRow: taskPointToRow,  fromRow: taskPointFromRow },
+  calendarNotes:   { table: 'calendar_notes',  toRow: noteToRow,       fromRow: noteFromRow },
 } as const;
 
 export type CollectionKey = keyof typeof TABLES;

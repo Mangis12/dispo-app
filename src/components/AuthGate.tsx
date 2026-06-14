@@ -52,7 +52,7 @@ function SupabaseAuthGate({ children }: { children: React.ReactNode }) {
     <div className="relative min-h-screen flex items-center justify-center p-4 font-sans text-ink overflow-hidden">
       {/* Reali kinematografinė nuotrauka su lėtu „Ken Burns" priartinimu (Etihad dvasia) */}
       <div className="absolute inset-0 overflow-hidden">
-        <img src="/img/hero-dusk.jpg" alt="" className="w-full h-full object-cover kenburns" />
+        <img src="/img/truck-eu.jpg" alt="" className="w-full h-full object-cover kenburns" />
       </div>
       {/* Firminis perdažymas — šiltas auksinis tonas + kremas legibilumui */}
       <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/55 to-ink/30" />
