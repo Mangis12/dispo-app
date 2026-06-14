@@ -18,8 +18,8 @@ import { supabase, isSupabaseEnabled } from './lib/supabase';
 import { loadAll, syncCollection, subscribeAll, type AllData } from './lib/repo';
 import TripPlanner from './components/TripPlanner';
 import CoordinatorBoard from './components/CoordinatorBoard';
-import { EmptyRoad, EmptyChecklist, SemiTruck, RouteMark, EuropeMap, VanSilhouette, HeroDrive } from './components/illustrations';
-import { VestexLogo, VestexMark } from './components/logo';
+import { EmptyRoad, EmptyChecklist, SemiTruck, RouteMark, EuropeMap, VanSilhouette } from './components/illustrations';
+import { VestexLogo } from './components/logo';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
   ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment, TaskPoint, CalendarNote
@@ -808,20 +808,24 @@ export default function App() {
         {/* ══════════════════ DASHBOARD ══════════════════ */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
-            {/* Hero — fura išvažiuoja keliu tolyn (kinematografinė animacija) */}
-            <div className="relative overflow-hidden rounded-3xl border border-hairline shadow-card h-48 sm:h-56">
-              <HeroDrive className="absolute inset-0" />
-              <div className="absolute inset-0 bg-gradient-to-r from-canvas via-canvas/70 to-transparent" />
-              <VestexMark className="absolute right-5 bottom-4 h-7 w-auto opacity-30" />
-              <div className="relative h-full flex flex-col justify-center px-6 sm:px-9 max-w-md">
-                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-gold">{format(new Date(), "EEEE, MMMM d", { locale: lt })}</p>
-                <h2 className="font-display text-2xl sm:text-3xl font-medium tracking-tight mt-1 text-ink">
-                  {(() => { const h = new Date().getHours(); return h < 12 ? 'Labas rytas' : h < 18 ? 'Laba diena' : 'Labas vakaras'; })()}
-                </h2>
-                <p className="text-sm text-muted mt-1.5">
-                  Šiandien <b className="font-semibold text-ink">{reiseDrivers.length}</b> reise · <b className="font-semibold text-ink">{namuoseDrivers.length}</b> namuose
-                  {urgentCount > 0 && <> · <span className="text-red-500 font-semibold">{urgentCount} skubu</span></>}
-                </p>
+            {/* Hero — švarus, modernus tipografinis pasveikinimas (be animacijos/logo) */}
+            <div className="relative overflow-hidden rounded-3xl border border-hairline shadow-card bg-surface">
+              <div className="pointer-events-none absolute -top-24 -right-10 w-80 h-80 rounded-full bg-gold/10 blur-3xl" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-surface via-surface to-canvas" />
+              <div className="relative px-6 sm:px-9 py-7 sm:py-9 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-gold">{format(new Date(), "EEEE, MMMM d", { locale: lt })}</p>
+                  <h2 className="font-display text-3xl sm:text-4xl font-medium tracking-tight mt-1.5 text-ink">
+                    {(() => { const h = new Date().getHours(); return h < 12 ? 'Labas rytas' : h < 18 ? 'Laba diena' : 'Labas vakaras'; })()}
+                  </h2>
+                  <p className="text-sm text-muted mt-2">Bendra parko ir vairuotojų apžvalga</p>
+                </div>
+                {/* Greita santrauka — elegantiškos pilės */}
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 text-blue-700 px-3 py-1.5 text-xs font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-blue-400" />{reiseDrivers.length} reise</span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 text-emerald-700 px-3 py-1.5 text-xs font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{namuoseDrivers.length} namuose</span>
+                  {urgentCount > 0 && <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 text-red-600 px-3 py-1.5 text-xs font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-red-400" />{urgentCount} skubu</span>}
+                </div>
               </div>
             </div>
 
