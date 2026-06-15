@@ -35,6 +35,8 @@ export interface Driver {
   email?: string;
   tabNr?: string;            // DS / vidinis numeris
   docs?: DriverDocs;
+  dismissedDate?: string | null; // Atleistas nuo (data). Jei nustatyta — vairuotojas atleistas.
+  unneeded?: boolean;            // Nereikalingas: nesiūlomas keitimuose, laikomas atskirai.
 }
 
 export interface Car {

@@ -25,6 +25,8 @@ export const driverToRow = (d: Driver): Row => ({
   email: d.email ?? null,
   tab_nr: d.tabNr ?? null,
   documents: d.docs ?? null,
+  dismissed_date: d.dismissedDate ?? null,
+  unneeded: d.unneeded ?? false,
 });
 
 export const driverFromRow = (r: Row): Driver => ({
@@ -43,6 +45,8 @@ export const driverFromRow = (r: Row): Driver => ({
   email: (r.email as string | null) ?? undefined,
   tabNr: (r.tab_nr as string | null) ?? undefined,
   docs: (r.documents as Driver['docs']) ?? undefined,
+  dismissedDate: (r.dismissed_date as string | null) ?? null,
+  unneeded: Boolean(r.unneeded),
 });
 
 // ── Car ──────────────────────────────────────────────────────────────────────

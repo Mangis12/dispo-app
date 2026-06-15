@@ -6,7 +6,8 @@ import {
   LayoutDashboard, Database, Wifi, WifiOff, Bell, Map as MapIcon, MapPin, Menu, Search, Mail, Undo2, StickyNote,
   List, LayoutGrid, Columns3, Download, Phone, Snowflake, Container,
   Upload, FileSpreadsheet, ShieldCheck, ShieldAlert, Contact, CreditCard, FileCheck2,
-  ClipboardList, GripVertical, Check, Lock, UserCog
+  ClipboardList, GripVertical, Check, Lock, UserCog,
+  UserX, UserMinus, RotateCcw, ChevronDown, Ban
 } from 'lucide-react';
 import {
   format, differenceInDays, parseISO, isBefore, isAfter,
@@ -260,6 +261,10 @@ export default function App() {
   const [selectedCarForAssignment, setSelectedCarForAssignment] = useState<string | null>(null);
   const [selectedDriverForHome, setSelectedDriverForHome]   = useState<Driver | null>(null);
   const [selectedDriverForEdit, setSelectedDriverForEdit]   = useState<Driver | null>(null);
+  const [dismissOpen, setDismissOpen]                       = useState(false);
+  const [selectedDriverForDismiss, setSelectedDriverForDismiss] = useState<Driver | null>(null);
+  const [showDismissed, setShowDismissed]                   = useState(false);
+  const [showUnneeded, setShowUnneeded]                     = useState(false);
   const [selectedCarForEdit, setSelectedCarForEdit]         = useState<Car | null>(null);
   const [editAssignment, setEditAssignment]                 = useState<CarAssignment | null>(null);
   const [planGroup, setPlanGroup]                           = useState<'all' | CarType>('all');
@@ -451,6 +456,52 @@ export default function App() {
         carNumber: updates.currentCar !== undefined ? (updates.currentCar || a.carNumber) : a.carNumber,
       } : a));
     }
+  };
+
+  // „Nereikalingas" žymė: vairuotojas nesiūlomas keitimuose, bet lieka matomas
+  // atskiroje planavimo zonoje (blogiausiam atvejui).
+  const toggleUnneeded = (d: Driver) => {
+    if (!guardEdit()) return;
+    const val = !d.unneeded;
+    setDrivers(prev => prev.map(x => x.id === d.id ? { ...x, unneeded: val } : x));
+    logHistory(d.id, d.name, val ? 'Pažymėtas nereikalingu' : 'Grąžintas į aktyvius', val ? 'Nesiūlomas keitimuose' : 'Vėl siūlomas keitimuose');
+    showToast(val ? `${d.name} — ${t('nereikalingas')}` : `${d.name} — ${t('aktyvus')}`);
+  };
+
+  // Atleidimas: vairuotojas perkeliamas į „Atleisti" skiltį, nuimamas nuo mašinos.
+  const dismissDriver = (id: string, date: string) => {
+    if (!guardEdit()) return;
+    const d = drivers.find(x => x.id === id);
+    if (!d) return;
+    // Uždarom atvirus priskyrimus atleidimo data.
+    setCarAssignments(prev => prev.map(a => a.driverId === id && a.endDate === null ? { ...a, endDate: date } : a));
+    setDrivers(prev => prev.map(x => x.id === id ? {
+      ...x, dismissedDate: date, unneeded: false,
+      status: 'Namuose', currentCar: 'Nėra', startDate: null, plannedReturnDate: null,
+    } : x));
+    logHistory(d.id, d.name, 'Atleistas', `Atleistas nuo ${date}`, undefined, date);
+    showToast(`${d.name} — ${t('atleistas')}`);
+    setDismissOpen(false); setSelectedDriverForDismiss(null);
+  };
+
+  // Grąžinimas iš atleistųjų į aktyvius (namuose).
+  const reinstateDriver = (d: Driver) => {
+    if (!guardEdit()) return;
+    setDrivers(prev => prev.map(x => x.id === d.id ? {
+      ...x, dismissedDate: null, status: 'Namuose', homeStatus: 'Poilsis',
+      readinessDate: x.readinessDate || format(new Date(), 'yyyy-MM-dd'),
+    } : x));
+    logHistory(d.id, d.name, 'Grąžintas', 'Grąžintas iš atleistųjų į aktyvius');
+    showToast(`${d.name} — ${t('grąžintas')}`);
+  };
+
+  // Dokumentų datų / tapatybės redagavimas rankiniu būdu (atnaujinus dokumentą).
+  const saveDriverDocs = (id: string, docs: Driver['docs'], extra: { email?: string; tabNr?: string }) => {
+    if (!guardEdit()) return;
+    const d = drivers.find(x => x.id === id);
+    setDrivers(prev => prev.map(x => x.id === id ? { ...x, docs, email: extra.email ?? x.email, tabNr: extra.tabNr ?? x.tabNr } : x));
+    if (d) logHistory(d.id, d.name, 'Atnaujinti dokumentai', 'Pakeistos dokumentų datos');
+    showToast(t('Dokumentai atnaujinti'));
   };
 
   // ── Excel importas ──────────────────────────────────────────────────────────
@@ -974,7 +1025,7 @@ export default function App() {
   const potentialReplacements = useMemo(() => {
     if (!replaceTarget) return [];
     const { company, carType } = replaceTarget;
-    return drivers.filter(d => d.status === 'Namuose').sort((a, b) => {
+    return drivers.filter(d => d.status === 'Namuose' && !d.dismissedDate && !d.unneeded).sort((a, b) => {
       // 1) ta pati įmonė pirmiau
       const ca = a.companyType === company ? 0 : 1;
       const cb = b.companyType === company ? 0 : 1;
@@ -992,13 +1043,15 @@ export default function App() {
   const potentialTrips = useMemo(() => {
     if (!selectedHomeDriverId) return [];
     const target = parseISO(targetWorkDate);
-    return drivers.filter(d => d.status === 'Reise' && d.plannedReturnDate && Math.abs(differenceInDays(parseISO(d.plannedReturnDate), target)) <= 14)
+    return drivers.filter(d => d.status === 'Reise' && !d.dismissedDate && d.plannedReturnDate && Math.abs(differenceInDays(parseISO(d.plannedReturnDate), target)) <= 14)
       .sort((a, b) => (a.plannedReturnDate || '').localeCompare(b.plannedReturnDate || ''));
   }, [drivers, selectedHomeDriverId, targetWorkDate]);
 
   // ── Render ────────────────────────────────────────────────────────────────────
-  const reiseDrivers  = drivers.filter(d => d.status === 'Reise');
-  const namuoseDrivers = drivers.filter(d => d.status === 'Namuose').sort((a, b) => (a.readinessDate || '').localeCompare(b.readinessDate || ''));
+  const reiseDrivers  = drivers.filter(d => d.status === 'Reise' && !d.dismissedDate);
+  // „Namuose" skydeliui/sąrašui = laisvi ir reikalingi (be atleistų ir nereikalingų).
+  const namuoseDrivers = drivers.filter(d => d.status === 'Namuose' && !d.dismissedDate && !d.unneeded).sort((a, b) => (a.readinessDate || '').localeCompare(b.readinessDate || ''));
+  const dismissedDrivers = drivers.filter(d => !!d.dismissedDate).sort((a, b) => (b.dismissedDate || '').localeCompare(a.dismissedDate || ''));
   const activePlans   = plans.filter(p => p.status === 'Suplanuota');
   // Planai be nustatyto keitimo taško — koordinatoriaus „darbų" skaičius.
   const coordinatorPending = activePlans.filter(p => p.changeLat == null).length;
@@ -1361,8 +1414,8 @@ export default function App() {
                 <Field label="Vairuotojas namuose">
                   <select className={selectCls} value={selectedHomeDriverId} onChange={e => setSelectedHomeDriverId(e.target.value)}>
                     <option value="">Pasirinkite...</option>
-                    {drivers.filter(d => d.status === 'Namuose').sort((a,b) => (a.readinessDate||'').localeCompare(b.readinessDate||'')).map(d => (
-                      <option key={d.id} value={d.id}>{d.name} ({d.companyType} • {d.specialization}) — nuo: {d.readinessDate || '?'}</option>
+                    {drivers.filter(d => d.status === 'Namuose' && !d.dismissedDate).sort((a,b) => (a.readinessDate||'').localeCompare(b.readinessDate||'')).map(d => (
+                      <option key={d.id} value={d.id}>{d.name} ({d.companyType} • {d.specialization}){d.unneeded ? ' • nereikalingas' : ''} — nuo: {d.readinessDate || '?'}</option>
                     ))}
                   </select>
                 </Field>
@@ -1491,12 +1544,15 @@ export default function App() {
 
         {/* ══════════════════ DRIVERS ══════════════════ */}
         {activeTab === 'drivers' && (() => {
-          const fd = drivers.filter(d => {
+          const matchesFilter = (d: Driver) => {
             const mc = !driverFilter.companyType || d.companyType === driverFilter.companyType;
             const ms = !driverFilter.specialization || d.specialization === driverFilter.specialization;
             const mx = !driverFilter.search || d.name.toLowerCase().includes(driverFilter.search.toLowerCase());
             return mc && ms && mx;
-          });
+          };
+          // Pagrindiniai sąrašai — be atleistų; atleistieji rodomi atskiroje skiltyje.
+          const fd = drivers.filter(d => !d.dismissedDate && matchesFilter(d));
+          const dismissedList = drivers.filter(d => !!d.dismissedDate && matchesFilter(d));
           const reiseList = fd.filter(d => d.status === 'Reise');
           const namuoseList = fd.filter(d => d.status === 'Namuose');
           const selectedList = fd.filter(d => selectedDriverIds.includes(d.id));
@@ -1525,6 +1581,7 @@ export default function App() {
                     <p className="text-[11px] text-muted truncate">{d.companyType} · {t(d.specialization)}</p>
                     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                       <Badge variant={d.status === 'Reise' ? 'blue' : 'green'}>{t(d.status)}</Badge>
+                      {d.unneeded && <Badge variant="amber">{t('Nereikalingas')}</Badge>}
                       {d.currentCar !== 'Nėra' && <span className="font-mono text-[10px] text-muted">{d.currentCar}</span>}
                       {plan && <span className="text-[9px] text-violet-600 font-bold">{t('PLANAS')}</span>}
                     </div>
@@ -1605,6 +1662,7 @@ export default function App() {
                           <td className="px-4 py-3"><div className="flex gap-1.5"><Badge>{d.companyType}</Badge><Badge variant="blue">{t(d.specialization)}</Badge></div></td>
                           <td className="px-4 py-3">
                             <Badge variant={d.status === 'Reise' ? 'blue' : 'green'}>{t(d.status)}</Badge>
+                            {d.unneeded && <span className="ml-1.5"><Badge variant="amber">{t('Nereikalingas')}</Badge></span>}
                             {plan && <span className="ml-1.5 text-[9px] text-violet-600 font-bold">{t('PLANAS')}</span>}
                             {isLate && <span className="ml-1.5"><Badge variant="red">{t('Vėluoja')}</Badge></span>}
                           </td>
@@ -1654,6 +1712,37 @@ export default function App() {
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 {fd.map(miniCard)}
                 {fd.length === 0 && <div className="col-span-full text-center text-muted py-10 text-sm">Nieko nerasta</div>}
+              </div>
+            )}
+
+            {/* ATLEISTI — sulankstoma skiltis */}
+            {dismissedList.length > 0 && (
+              <div className="bg-canvas/40 rounded-2xl border border-hairline overflow-hidden">
+                <button onClick={() => setShowDismissed(v => !v)} className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-stone-50 transition-colors">
+                  <UserX size={15} className="text-stone-400" />
+                  <p className="text-sm font-semibold">{t('Atleisti')}</p>
+                  <span className="text-xs text-muted">· {dismissedList.length}</span>
+                  <span className="ml-auto text-[11px] text-muted">{showDismissed ? t('Slėpti') : t('Rodyti')}</span>
+                  <ChevronDown size={16} className={cn('text-muted transition-transform', showDismissed && 'rotate-180')} />
+                </button>
+                {showDismissed && (
+                  <div className="px-3 pb-3 space-y-2">
+                    {dismissedList.map(d => (
+                      <div key={d.id} onClick={() => setProfileDriver(d)} className="bg-surface rounded-xl border border-hairline p-3 flex items-center gap-3 cursor-pointer hover:border-ink/20 transition-all opacity-80 hover:opacity-100">
+                        <div className="w-9 h-9 rounded-full bg-stone-200 text-stone-500 flex items-center justify-center text-[11px] font-semibold shrink-0">{d.name.split(' ').map(w => w[0]).slice(0, 2).join('')}</div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-sm truncate">{d.name}</p>
+                          <p className="text-[11px] text-muted truncate">{d.companyType} · {t(d.specialization)} · <span className="text-red-500 font-medium">{t('Atleistas nuo')} {d.dismissedDate}</span></p>
+                        </div>
+                        {canEdit && (
+                          <button onClick={e => { e.stopPropagation(); reinstateDriver(d); }} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-500 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-600 transition-colors shrink-0">
+                            <RotateCcw size={12} /> {t('Grąžinti')}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1976,9 +2065,11 @@ export default function App() {
 
         {/* ══════════════════ KEITIMO JUODRAŠTIS ══════════════════ */}
         {activeTab === 'draft' && (() => {
-          const homeDrivers = drivers.filter(d => d.status === 'Namuose');
+          const homeDrivers = drivers.filter(d => d.status === 'Namuose' && !d.dismissedDate && !d.unneeded);
           const usedIds = new Set(drafts.map(d => d.incomingDriverId));
           const pool = homeDrivers.filter(d => !usedIds.has(d.id));
+          // Nereikalingi (namuose) — atskira zona; nesiūlomi, bet matomi blogiausiam atvejui.
+          const unneededPool = drivers.filter(d => d.status === 'Namuose' && !d.dismissedDate && d.unneeded && !usedIds.has(d.id));
           // Tik mašinos, kurios keičiasi šią savaitę: dabartinis vairuotojas grįžta
           // iki šios savaitės pabaigos (įskaitant vėluojančius) ir dar nesuplanuota.
           const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
@@ -2130,6 +2221,29 @@ export default function App() {
                   })}
                 </div>
               </div>
+            </div>
+
+            {/* Nereikalingi — sulankstoma zona (paspaudus pamatyti; blogiausiam atvejui) */}
+            <div className="bg-canvas/40 rounded-2xl border border-hairline overflow-hidden">
+              <button onClick={() => setShowUnneeded(v => !v)} className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-stone-50 transition-colors">
+                <Ban size={15} className="text-stone-400" />
+                <p className="text-sm font-semibold">{t('Nereikalingi')}</p>
+                <span className="text-xs text-muted">· {unneededPool.length}</span>
+                <span className="ml-auto text-[11px] text-muted">{showUnneeded ? t('Slėpti') : t('Rodyti')}</span>
+                <ChevronDown size={16} className={cn('text-muted transition-transform', showUnneeded && 'rotate-180')} />
+              </button>
+              {showUnneeded && (
+                <div className="px-4 pb-4">
+                  {unneededPool.length === 0
+                    ? <p className="text-xs text-muted text-center py-4">{t('Nereikalingų vairuotojų nėra')}</p>
+                    : <>
+                        <p className="text-[11px] text-muted mb-2">{t('Šie vairuotojai nesiūlomi automatiškai, bet juos galima įtraukti rankiniu būdu.')}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {unneededPool.map(d => <div key={d.id} className="opacity-75 hover:opacity-100 transition-opacity">{driverChip(d, 'pool')}</div>)}
+                        </div>
+                      </>}
+                </div>
+              )}
             </div>
 
             {/* Peržiūra + patvirtinimas */}
@@ -2526,7 +2640,7 @@ export default function App() {
       {tripOpen && (selectedDriverForTrip || selectedCarForAssignment) && (
         <Modal title={selectedDriverForTrip ? `${t('Į reisą')}: ${selectedDriverForTrip.name}` : `${t('Priskirti')}: ${selectedCarForAssignment}`} onClose={() => { setTripOpen(false); setSelectedDriverForTrip(null); setSelectedCarForAssignment(null); }}>
           <form className="space-y-4" onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); const did = selectedDriverForTrip?.id || f.get('driverId') as string; const car = selectedCarForAssignment || f.get('car') as string; sendToTrip(did, car, f.get('startDate') as string, f.get('returnDate') as string); }}>
-            {!selectedDriverForTrip && <Field label={t('Vairuotojas')}><select name="driverId" required className={selectCls}><option value="">{t('Pasirinkite...')}</option>{drivers.filter(d => d.status === 'Namuose').map(d => <option key={d.id} value={d.id}>{d.name} ({d.companyType} • {t(d.specialization)})</option>)}</select></Field>}
+            {!selectedDriverForTrip && <Field label={t('Vairuotojas')}><select name="driverId" required className={selectCls}><option value="">{t('Pasirinkite...')}</option>{drivers.filter(d => d.status === 'Namuose' && !d.dismissedDate).map(d => <option key={d.id} value={d.id}>{d.name} ({d.companyType} • {t(d.specialization)}){d.unneeded ? ` • ${t('nereikalingas')}` : ''}</option>)}</select></Field>}
             {!selectedCarForAssignment && <Field label={t('Automobilis')}><select name="car" required className={selectCls}>{cars.map(c => <option key={c.id} value={c.number}>{c.number} ({c.registration} • {t(c.type)})</option>)}</select></Field>}
             <div className="grid grid-cols-2 gap-3">
               <Field label={t('Pradžia')}><input name="startDate" type="date" required defaultValue={format(new Date(), 'yyyy-MM-dd')} className={inputCls} /></Field>
@@ -2544,6 +2658,20 @@ export default function App() {
             <Field label={t('Būsena namuose')}><select name="status" required className={selectCls}><option value="Poilsis">{t('Poilsis')}</option><option value="Tvarko dokumentus">{t('Tvarko dokumentus')}</option></select></Field>
             <Field label={t('Gali nuo')}><input name="readinessDate" type="date" required defaultValue={format(addDays(new Date(), 14), 'yyyy-MM-dd')} className={inputCls} /></Field>
             <button type="submit" className="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors">{t('Patvirtinti')}</button>
+          </form>
+        </Modal>
+      )}
+
+      {/* Atleidimas: pasirinkti atleidimo datą */}
+      {dismissOpen && selectedDriverForDismiss && (
+        <Modal title={`${t('Atleisti')}: ${selectedDriverForDismiss.name}`} onClose={() => { setDismissOpen(false); setSelectedDriverForDismiss(null); }}>
+          <form className="space-y-4" onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); dismissDriver(selectedDriverForDismiss.id, f.get('dismissedDate') as string); }}>
+            <div className="flex items-start gap-2 text-[11px] text-muted bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+              <UserX size={14} className="text-red-500 shrink-0 mt-0.5" />
+              <span>{t('Vairuotojas bus perkeltas į „Atleisti" skiltį ir nuimtas nuo mašinos. Vėliau jį galima grąžinti.')}</span>
+            </div>
+            <Field label={t('Atleistas nuo')}><input name="dismissedDate" type="date" required defaultValue={format(new Date(), 'yyyy-MM-dd')} className={inputCls} /></Field>
+            <button type="submit" className="w-full inline-flex items-center justify-center gap-2 bg-red-500 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-red-600 transition-colors"><UserX size={15} /> {t('Atleisti')}</button>
           </form>
         </Modal>
       )}
@@ -2685,12 +2813,16 @@ export default function App() {
       {/* Vairuotojo profilio šoninė panelė (drawer) */}
       {profileDriver && (
         <DriverProfileDrawer
-          driver={profileDriver} canEdit={canEdit}
+          driver={drivers.find(d => d.id === profileDriver.id) ?? profileDriver} canEdit={canEdit}
           plans={plans} carAssignments={carAssignments} history={history}
           onClose={() => setProfileDriver(null)}
           onTrip={(d) => { setProfileDriver(null); setSelectedDriverForTrip(d); setTripOpen(true); }}
           onHome={(d) => { setProfileDriver(null); setSelectedDriverForHome(d); setHomeOpen(true); }}
           onEdit={(d) => { setProfileDriver(null); setSelectedDriverForEdit(d); setEditDriverOpen(true); }}
+          onToggleUnneeded={toggleUnneeded}
+          onDismiss={(d) => { setProfileDriver(null); setSelectedDriverForDismiss(d); setDismissOpen(true); }}
+          onReinstate={reinstateDriver}
+          onSaveDocs={saveDriverDocs}
         />
       )}
 
@@ -2868,12 +3000,16 @@ function MonthNav({ value, onChange }: { value: Date; onChange: (d: Date) => voi
 // dešinėje pusėje rodoma line-art detalė (pvz. mikroautobusas).
 // Vairuotojo profilio šoninė panelė: kontaktai, būsena, dabartinė mašina,
 // susiję planai, priskyrimų ir veiksmų istorija + greiti veiksmai.
-function DriverProfileDrawer({ driver, canEdit, plans, carAssignments, history, onClose, onTrip, onHome, onEdit }: {
+function DriverProfileDrawer({ driver, canEdit, plans, carAssignments, history, onClose, onTrip, onHome, onEdit, onToggleUnneeded, onDismiss, onReinstate, onSaveDocs }: {
   driver: Driver; canEdit: boolean; plans: ReplacementPlan[]; carAssignments: CarAssignment[]; history: HistoryEntry[];
   onClose: () => void; onTrip: (d: Driver) => void; onHome: (d: Driver) => void; onEdit: (d: Driver) => void;
+  onToggleUnneeded: (d: Driver) => void; onDismiss: (d: Driver) => void; onReinstate: (d: Driver) => void;
+  onSaveDocs: (id: string, docs: Driver['docs'], extra: { email?: string; tabNr?: string }) => void;
 }) {
   const t = useT();
   const d = driver;
+  const [editDocs, setEditDocs] = useState(false);
+  const dismissed = !!d.dismissedDate;
   const initials = d.name.split(' ').map(w => w[0]).slice(0, 2).join('');
   const relPlans = plans.filter(p => p.leavingDriverId === d.id || p.incomingDriverId === d.id).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
   // Darbo / poilsio istorija: priskyrimai = darbas (ant mašinos), tarpai = poilsis
@@ -2915,6 +3051,8 @@ function DriverProfileDrawer({ driver, canEdit, plans, carAssignments, history, 
             <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium">{d.companyType}</span>
             <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium">{t(d.specialization)}</span>
             {isLate && <span className="rounded-full bg-red-500/25 text-red-100 px-2.5 py-1 text-xs font-semibold">{t('Vėluoja')}</span>}
+            {d.unneeded && <span className="rounded-full bg-amber-500/25 text-amber-100 px-2.5 py-1 text-xs font-semibold">{t('Nereikalingas')}</span>}
+            {dismissed && <span className="rounded-full bg-red-500/30 text-red-100 px-2.5 py-1 text-xs font-semibold">{t('Atleistas nuo')} {d.dismissedDate}</span>}
           </div>
         </div>
 
@@ -2934,7 +3072,7 @@ function DriverProfileDrawer({ driver, canEdit, plans, carAssignments, history, 
           </div>
 
           {/* Greiti veiksmai — tik turintiems redagavimo teises */}
-          {canEdit && (
+          {canEdit && !dismissed && (
           <div className="flex gap-2">
             {d.status === 'Reise'
               ? <button onClick={() => onHome(d)} className="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-600 transition-colors"><LogOut size={15} /> {t('Siųsti namo')}</button>
@@ -2943,22 +3081,72 @@ function DriverProfileDrawer({ driver, canEdit, plans, carAssignments, history, 
           </div>
           )}
 
+          {/* Statuso veiksmai: nereikalingas / atleidimas / grąžinimas */}
+          {canEdit && (
+          <div className="flex gap-2">
+            {dismissed ? (
+              <button onClick={() => onReinstate(d)} className="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-600 transition-colors"><RotateCcw size={15} /> {t('Grąžinti į aktyvius')}</button>
+            ) : (<>
+              <button onClick={() => onToggleUnneeded(d)} className={cn('flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all border', d.unneeded ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100')}>
+                {d.unneeded ? <><RotateCcw size={15} /> {t('Grąžinti į reikalingus')}</> : <><UserMinus size={15} /> {t('Pažymėti nereikalingu')}</>}
+              </button>
+              <button onClick={() => onDismiss(d)} className="inline-flex items-center justify-center gap-2 px-4 bg-red-50 text-red-600 border border-red-200 rounded-xl text-sm font-semibold hover:bg-red-100 transition-all"><UserX size={15} /> {t('Atleisti')}</button>
+            </>)}
+          </div>
+          )}
+
           {/* Dokumentai ir galiojimai */}
-          {(d.docs || d.email || d.tabNr) && (() => {
+          {(() => {
             const docs = d.docs ?? {};
             const items = DOC_FIELDS.map(f => ({ ...f, iso: docs[f.key] as string | undefined, ...docState(docs[f.key] as string | undefined) }))
               .filter(it => it.iso);
             const expired = items.filter(it => it.state === 'expired').length;
             const soon = items.filter(it => it.state === 'soon').length;
+            const inCls = 'w-full bg-canvas border border-hairline rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-ink/40';
             return (
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">{t('Dokumentai')}</p>
-                  {expired > 0 ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full"><ShieldAlert size={11} />{expired} {t('pasibaigę')}</span>
-                    : soon > 0 ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full"><ShieldAlert size={11} />{soon} {t('baigiasi')}</span>
-                    : items.length > 0 ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full"><ShieldCheck size={11} />{t('Galioja')}</span> : null}
+                  <div className="flex items-center gap-1.5">
+                    {!editDocs && (expired > 0 ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full"><ShieldAlert size={11} />{expired} {t('pasibaigę')}</span>
+                      : soon > 0 ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full"><ShieldAlert size={11} />{soon} {t('baigiasi')}</span>
+                      : items.length > 0 ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full"><ShieldCheck size={11} />{t('Galioja')}</span> : null)}
+                    {canEdit && !editDocs && <button onClick={() => setEditDocs(true)} title={t('Redaguoti datas')} className="inline-flex items-center gap-1 text-[10px] font-bold text-ink bg-ink/[0.06] hover:bg-ink hover:text-white px-2 py-0.5 rounded-full transition-all"><Edit size={11} /> {t('Redaguoti')}</button>}
+                  </div>
                 </div>
 
+                {editDocs ? (
+                  /* ── Redagavimo forma: rankinis datų / tapatybės keitimas ── */
+                  <form onSubmit={e => {
+                    e.preventDefault();
+                    const f = new FormData(e.currentTarget);
+                    const val = (k: string) => { const v = (f.get(k) as string || '').trim(); return v || undefined; };
+                    const newDocs: Driver['docs'] = { ...docs };
+                    DOC_FIELDS.forEach(fd => { (newDocs as Record<string, unknown>)[fd.key] = val(fd.key); });
+                    newDocs.personalCode = val('personalCode');
+                    newDocs.passportNo = val('passportNo');
+                    newDocs.tachoCountry = val('tachoCountry');
+                    onSaveDocs(d.id, newDocs, { email: val('email'), tabNr: val('tabNr') });
+                    setEditDocs(false);
+                  }} className="bg-surface rounded-2xl border border-hairline p-3 space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="block"><span className="text-[10px] text-muted">{t('Asmens kodas')}</span><input name="personalCode" defaultValue={docs.personalCode || ''} className={inCls} /></label>
+                      <label className="block"><span className="text-[10px] text-muted">{t('Paso NR.')}</span><input name="passportNo" defaultValue={docs.passportNo || ''} className={inCls} /></label>
+                      <label className="block"><span className="text-[10px] text-muted">{t('Tacho šalis')}</span><input name="tachoCountry" defaultValue={docs.tachoCountry || ''} className={inCls} /></label>
+                      <label className="block"><span className="text-[10px] text-muted">{t('DS Nr.')}</span><input name="tabNr" defaultValue={d.tabNr || ''} className={inCls} /></label>
+                      <label className="block col-span-2"><span className="text-[10px] text-muted">{t('El. paštas')}</span><input name="email" type="email" defaultValue={d.email || ''} className={inCls} /></label>
+                    </div>
+                    <div className="border-t border-hairline pt-3 grid grid-cols-2 gap-2">
+                      {DOC_FIELDS.map(fd => (
+                        <label key={fd.key} className="block"><span className="text-[10px] text-muted">{t(fd.label)}</span><input name={fd.key} type="date" defaultValue={(docs[fd.key] as string) || ''} className={inCls} /></label>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button type="submit" className="flex-1 inline-flex items-center justify-center gap-2 bg-ink text-white py-2 rounded-lg text-xs font-bold hover:bg-ink/90 transition-colors"><Check size={14} /> {t('Išsaugoti')}</button>
+                      <button type="button" onClick={() => setEditDocs(false)} className="px-4 inline-flex items-center justify-center gap-2 bg-ink/[0.05] text-ink py-2 rounded-lg text-xs font-bold hover:bg-ink/10 transition-colors">{t('Atšaukti')}</button>
+                    </div>
+                  </form>
+                ) : (<>
                 {/* Tapatybės info */}
                 {(docs.personalCode || docs.passportNo || docs.tachoCountry || d.email || d.tabNr) && (
                   <div className="bg-surface rounded-2xl border border-hairline p-3 mb-2 grid grid-cols-2 gap-x-4 gap-y-1.5">
@@ -2990,7 +3178,8 @@ function DriverProfileDrawer({ driver, canEdit, plans, carAssignments, history, 
                       </div>
                     ))}
                   </div>
-                ) : <p className="text-xs text-muted">{t('Dokumentų datų nėra. Importuokite Excel sąrašą.')}</p>}
+                ) : <p className="text-xs text-muted">{canEdit ? t('Dokumentų datų nėra. Spauskite „Redaguoti" arba importuokite Excel.') : t('Dokumentų datų nėra. Importuokite Excel sąrašą.')}</p>}
+                </>)}
               </div>
             );
           })()}
