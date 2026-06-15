@@ -14,7 +14,9 @@ export interface DriverDocs {
   tachoCardExpiry?: string;  // Chip kortelės galiojimas (tacho)
   tachoCountry?: string;     // Tacho šalis
   pinkSheetExpiry?: string;  // Rožinio lapo galiojimas
-  llglExpiry?: string;       // LLGL galiojimas
+  llglExpiry?: string;       // LLGL galiojimas (LT įmonės)
+  visaExpiry?: string;       // Vizos galiojimas (PL įmonės)
+  adrExpiry?: string;        // ADR pažymėjimo galiojimas
 }
 
 export interface Driver {

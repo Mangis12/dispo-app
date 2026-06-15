@@ -40,10 +40,12 @@ const FIELD_MATCHERS: { key: string; patterns: string[] }[] = [
   { key: 'passportExpiry', patterns: ['paso galiojim'] },
   { key: 'licenseExpiry',  patterns: ['teisiu galiojim', 'teisiu'] },
   { key: 'code95Expiry',   patterns: ['95 kodo', '95 kod', 'kodo galiojim'] },
-  { key: 'tachoExpiry',    patterns: ['chip korteles', 'chip kortel', 'tacho galiojim'] },
+  { key: 'tachoExpiry',    patterns: ['chip korteles', 'chip kortel', 'tacho korteles', 'tacho kortel', 'tacho galiojim'] },
   { key: 'tachoCountry',   patterns: ['tacho salis', 'tacho sal'] },
   { key: 'pinkSheetExpiry',patterns: ['rozinio lapo', 'rozinio'] },
-  { key: 'llglExpiry',     patterns: ['llgl galiojim', 'llgl'] },
+  { key: 'visaExpiry',     patterns: ['vizos galiojim', 'vizos', 'viza'] },
+  { key: 'llglExpiry',     patterns: ['llgl galiojim', 'llgl', 'llg galiojim'] },
+  { key: 'adrExpiry',      patterns: ['adr'] },
   { key: 'company',        patterns: ['imone', 'company'] },
 ];
 
@@ -144,6 +146,8 @@ export function parseDriverWorkbook(data: ArrayBuffer): { rows: ParsedDriver[]; 
       tachoCountry:   tachoCountry || undefined,
       pinkSheetExpiry:toISO(get(row, 'pinkSheetExpiry')),
       llglExpiry:     toISO(get(row, 'llglExpiry')),
+      visaExpiry:     toISO(get(row, 'visaExpiry')),
+      adrExpiry:      toISO(get(row, 'adrExpiry')),
     };
 
     rows.push({
@@ -202,6 +206,28 @@ export function buildDriverIndex<T extends { id: string; docs?: DriverDocs; tabN
     byNm.set(k.nm, d);
   });
   return { byPc, byTab, byNm };
+}
+
+// ── Pavyzdinio (šablono) failo generavimas ────────────────────────────────────
+// LT ir PL įmonių dokumentai skiriasi: LT — LLGL, PL — Viza. Abi — ADR.
+export function templateHeaders(company: 'LT' | 'PL'): string[] {
+  const common = ['Pavardė', 'Vardas', 'Paso galiojimo data', 'Paso NR.', 'Teisių galiojimas', '95 kodo galiojimas', 'Tacho kortelės galiojimas'];
+  const specific = company === 'LT' ? ['LLGL galiojimas'] : ['Vizos galiojimas'];
+  return [...common, ...specific, 'ADR', 'Tel', 'e-mail', 'Asmens kodas', 'Įmonė'];
+}
+
+export function buildDriverTemplate(company: 'LT' | 'PL'): Blob {
+  const headers = templateHeaders(company);
+  const example = company === 'LT'
+    ? ['Pavardenis', 'Jonas', '2030-05-20', 'AC1234567', '2029-08-15', '2028-03-10', '2027-11-30', '2031-01-01', '2026-12-31', '+370 600 00000', 'vardas@imone.lt', '39001011234', 'LT']
+    : ['Kowalski', 'Jan', '2030-05-20', 'AC1234567', '2029-08-15', '2028-03-10', '2027-11-30', '2030-09-09', '2026-12-31', '+48 600 000000', 'jan@firma.pl', '39001011234', 'PL'];
+  const aoa = [headers, example];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = headers.map(() => ({ wch: 18 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, company === 'LT' ? 'LT vairuotojai' : 'PL vairuotojai');
+  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+  return new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 
 // Suranda esamą vairuotoją importuojamai eilutei (pc → tab → vardas).

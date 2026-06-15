@@ -21,7 +21,7 @@ import { loadAll, syncCollection, subscribeAll, type AllData } from './lib/repo'
 import TripPlanner from './components/TripPlanner';
 import CoordinatorBoard from './components/CoordinatorBoard';
 import { EmptyRoad, EmptyChecklist, SemiTruck, EuropeMap } from './components/illustrations';
-import { parseDriverWorkbook, mergeIntoDriver, buildDriverIndex, findExisting, type ParsedDriver } from './lib/importDrivers';
+import { parseDriverWorkbook, mergeIntoDriver, buildDriverIndex, findExisting, buildDriverTemplate, type ParsedDriver } from './lib/importDrivers';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
   ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment, TaskPoint, CalendarNote
@@ -47,8 +47,10 @@ const DOC_FIELDS: { key: keyof NonNullable<Driver['docs']>; label: string }[] = 
   { key: 'licenseExpiry',  label: 'Teisės' },
   { key: 'code95Expiry',   label: '95 kodas' },
   { key: 'tachoCardExpiry',label: 'Tacho kortelė' },
-  { key: 'pinkSheetExpiry',label: 'Rožinis lapas' },
+  { key: 'adrExpiry',      label: 'ADR' },
   { key: 'llglExpiry',     label: 'LLGL' },
+  { key: 'visaExpiry',     label: 'Viza' },
+  { key: 'pinkSheetExpiry',label: 'Rožinis lapas' },
 ];
 // Blogiausia vairuotojo dokumentų būsena (perspėjimui sąraše).
 function worstDocState(d: Driver): DocState {
@@ -408,6 +410,15 @@ export default function App() {
   };
 
   // ── Excel importas ──────────────────────────────────────────────────────────
+  const downloadTemplate = (company: 'LT' | 'PL') => {
+    const blob = buildDriverTemplate(company);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `vairuotoju_sablonas_${company}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const handleImportFile = async (file: File) => {
     setImportErr(null);
     try {
@@ -1840,10 +1851,20 @@ export default function App() {
                     <div className="border-2 border-dashed border-hairline hover:border-gold/60 rounded-2xl p-10 text-center transition-colors bg-canvas">
                       <Upload size={28} className="mx-auto text-muted mb-3" />
                       <p className="text-sm font-semibold text-ink">Pasirinkite Excel failą</p>
-                      <p className="text-xs text-muted mt-1">Stulpeliai atpažįstami automatiškai: Pavardė, Vardas, Tel, Paso galiojimo data, Teisių galiojimas, 95 kodo, Chip kortelės, Rožinio lapo, Asmens kodas, LLGL…</p>
+                      <p className="text-xs text-muted mt-1">Stulpeliai atpažįstami automatiškai: Pavardė, Vardas, Tel, Paso galiojimo data, Teisių galiojimas, 95 kodo, Tacho kortelės, LLGL / Viza, ADR, Asmens kodas…</p>
                     </div>
                   </label>
                   {importErr && <p className="mt-4 text-xs font-medium text-red-600 bg-red-50 rounded-xl px-3 py-2.5">{importErr}</p>}
+
+                  {/* Pavyzdiniai šablonai — LT ir PL įmonių dokumentai skiriasi */}
+                  <div className="mt-4 rounded-2xl border border-hairline bg-canvas p-4">
+                    <p className="text-xs font-semibold text-ink mb-0.5">Nežinote formato? Atsisiųskite pavyzdį</p>
+                    <p className="text-[11px] text-muted mb-3">LT ir PL įmonių dokumentai skiriasi: <b>LT — LLGL</b>, <b>PL — Viza</b>; abiem — ADR. Užpildykite šabloną ir įkelkite.</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button onClick={() => downloadTemplate('LT')} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-hairline bg-surface text-xs font-semibold text-ink hover:border-ink/40 hover:bg-ink hover:text-white transition-all"><Download size={13} /> LT įmonės šablonas</button>
+                      <button onClick={() => downloadTemplate('PL')} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-hairline bg-surface text-xs font-semibold text-ink hover:border-ink/40 hover:bg-ink hover:text-white transition-all"><Download size={13} /> PL įmonės šablonas</button>
+                    </div>
+                  </div>
                   <div className="mt-4 flex items-start gap-2 text-[11px] text-muted bg-gold/5 border border-gold/20 rounded-xl px-3 py-2.5">
                     <ShieldCheck size={14} className="text-gold shrink-0 mt-0.5" />
                     <span>Atitikimas pagal <b>Asmens kodą</b> (jei nėra — DS numerį, tada vardą+pavardę). Esami vairuotojai <b>atnaujinami</b>, nauji — <b>pridedami</b>. Reiso būsenos ir istorija nekeičiamos.</span>
@@ -1866,7 +1887,8 @@ export default function App() {
                         <th className="px-3 py-2 font-bold">Teisės</th>
                         <th className="px-3 py-2 font-bold">95 k.</th>
                         <th className="px-3 py-2 font-bold">Tacho</th>
-                        <th className="px-3 py-2 font-bold">LLGL</th>
+                        <th className="px-3 py-2 font-bold">ADR</th>
+                        <th className="px-3 py-2 font-bold">LLGL/Viza</th>
                       </tr></thead>
                       <tbody>
                         {importRows.slice(0, 60).map((p, i) => {
@@ -1882,7 +1904,8 @@ export default function App() {
                               {cell(p.docs.licenseExpiry)}
                               {cell(p.docs.code95Expiry)}
                               {cell(p.docs.tachoCardExpiry)}
-                              {cell(p.docs.llglExpiry)}
+                              {cell(p.docs.adrExpiry)}
+                              {cell(p.companyType === 'PL' ? p.docs.visaExpiry : p.docs.llglExpiry)}
                             </tr>
                           );
                         })}
