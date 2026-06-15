@@ -5,7 +5,8 @@ import {
   CheckCircle2, User, Trash2, ChevronLeft, ChevronRight,
   LayoutDashboard, Database, Wifi, WifiOff, Bell, Map as MapIcon, MapPin, Menu, Search, Mail, Undo2, StickyNote,
   List, LayoutGrid, Columns3, Download, Phone, Snowflake, Container,
-  Upload, FileSpreadsheet, ShieldCheck, ShieldAlert, Contact, CreditCard, FileCheck2
+  Upload, FileSpreadsheet, ShieldCheck, ShieldAlert, Contact, CreditCard, FileCheck2,
+  ClipboardList, GripVertical, Check
 } from 'lucide-react';
 import {
   format, differenceInDays, parseISO, isBefore, isAfter,
@@ -80,7 +81,7 @@ const INITIAL_CARS: Car[] = [
   { id: 'c3', number: 'BCZ 555', status: 'Aktyvus', type: 'Tentas', registration: 'PL', activeFrom: '2026-01-01' },
 ];
 
-type Tab = 'dashboard' | 'planning' | 'drivers' | 'cars' | 'history' | 'calendar' | 'auto-grafikas' | 'trip' | 'coordinator';
+type Tab = 'dashboard' | 'planning' | 'drivers' | 'cars' | 'history' | 'calendar' | 'auto-grafikas' | 'trip' | 'coordinator' | 'draft';
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, accent, onClick, art }: { label: string; value: number | string; sub?: string; accent?: string; onClick?: () => void; art?: React.ReactNode }) {
@@ -274,6 +275,9 @@ export default function App() {
   const [carImportRows, setCarImportRows]     = useState<ParsedCar[]>([]);
   const [carImportMeta, setCarImportMeta]     = useState<{ fileName: string } | null>(null);
   const [carImportErr, setCarImportErr]       = useState<string | null>(null);
+  // Keitimo juodraštis: laikinas keitimų rinkinys (carNumber → incoming vairuotojas)
+  const [drafts, setDrafts] = useState<{ carNumber: string; incomingDriverId: string; date: string }[]>([]);
+  const [dragOverZone, setDragOverZone] = useState<string | null>(null); // carNumber arba 'pool'
   // Automobilių „duomenų bazė"
   const [carView, setCarView]                 = useState<'table' | 'kanban' | 'cards'>('cards');
   const [profileCar, setProfileCar]           = useState<Car | null>(null);
@@ -626,6 +630,32 @@ export default function App() {
     showToast('Planas atšauktas');
   };
 
+  // ── Keitimo juodraštis ──────────────────────────────────────────────────────
+  // Priskiria vairuotoją mašinai (vienas vairuotojas — vienoje vietoje;
+  // viena mašina — vienas keitimas). Galima tempti tarp mašinų.
+  const assignDraft = (carNumber: string, incomingDriverId: string) => {
+    setDrafts(prev => {
+      // pašalinam vairuotoją iš kitur ir mašiną iš kitur, tada pridedam
+      const cleaned = prev.filter(d => d.incomingDriverId !== incomingDriverId && d.carNumber !== carNumber);
+      const existingDate = prev.find(d => d.carNumber === carNumber)?.date;
+      return [...cleaned, { carNumber, incomingDriverId, date: existingDate || format(new Date(), 'yyyy-MM-dd') }];
+    });
+  };
+  const removeDraft = (carNumber: string) => setDrafts(prev => prev.filter(d => d.carNumber !== carNumber));
+  const setDraftDate = (carNumber: string, date: string) => setDrafts(prev => prev.map(d => d.carNumber === carNumber ? { ...d, date } : d));
+  const clearDrafts = () => setDrafts([]);
+  const confirmDrafts = () => {
+    if (drafts.length === 0) return;
+    drafts.forEach(d => {
+      const leaving = drivers.find(dr => dr.currentCar === d.carNumber && dr.status === 'Reise');
+      createPlan(d.carNumber, leaving?.id ?? null, d.incomingDriverId, d.date);
+    });
+    const n = drafts.length;
+    setDrafts([]);
+    showToast(`${t('Keitimai suplanuoti')}: ${n}`);
+    setActiveTab('planning');
+  };
+
   const completePlan = (planId: string, execReturnDate?: string, actualDate?: string) => {
     const plan = plans.find(p => p.id === planId);
     if (!plan) return;
@@ -936,6 +966,7 @@ export default function App() {
     calendar:        { title: t('Kalendorius'),  subtitle: t('Keitimai pagal mėnesį') },
     'auto-grafikas': { title: t('Grafikas'),     subtitle: t('Automobilių užimtumo juosta') },
     coordinator:     { title: t('Koordinatorius'), subtitle: t('Keitimo taškai žemėlapyje — eina į Kelionę') },
+    draft:           { title: t('Keitimo juodraštis'), subtitle: t('Sujunkite mašiną su vairuotoju — patvirtinus keitimas suplanuojamas') },
     trip:            { title: t('Kelionė'),      subtitle: t('Maršrutų ir keitimo logistika') },
   };
   const meta = pageMeta[activeTab];
@@ -968,6 +999,7 @@ export default function App() {
             <NavItem active={activeTab === 'planning'} onClick={() => go('planning')} icon={<ArrowRightLeft size={17}/>} label={t('Planavimas')} badge={urgentCount} />
             <NavItem active={activeTab === 'calendar'} onClick={() => go('calendar')} icon={<Calendar size={17}/>} label={t('Kalendorius')} />
             <NavItem active={activeTab === 'auto-grafikas'} onClick={() => go('auto-grafikas')} icon={<LayoutDashboard size={17}/>} label={t('Grafikas')} />
+            <NavItem active={activeTab === 'draft'} onClick={() => go('draft')} icon={<ClipboardList size={17}/>} label={t('Keitimo juodraštis')} badge={drafts.length || undefined} />
             <NavItem active={activeTab === 'coordinator'} onClick={() => go('coordinator')} icon={<MapPin size={17}/>} label={t('Koordinatorius')} badge={coordinatorPending} />
             <NavItem active={activeTab === 'trip'} onClick={() => go('trip')} icon={<MapIcon size={17}/>} label={t('Kelionė')} />
           </NavGroup>
@@ -1868,6 +1900,163 @@ export default function App() {
             <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} showCars onEditAssignment={setEditAssignment} onMoveAssignment={moveAssignment} onMovePlanDate={movePlanDate} onMovePlanToCar={movePlanToCar} onResizeAssignment={resizeAssignment} />
           </div>
         )}
+
+        {/* ══════════════════ KEITIMO JUODRAŠTIS ══════════════════ */}
+        {activeTab === 'draft' && (() => {
+          const homeDrivers = drivers.filter(d => d.status === 'Namuose');
+          const usedIds = new Set(drafts.map(d => d.incomingDriverId));
+          const pool = homeDrivers.filter(d => !usedIds.has(d.id));
+          const boardCars = cars.filter(c => c.status === 'Aktyvus');
+          const draftFor = (carNumber: string) => drafts.find(d => d.carNumber === carNumber);
+          const driverById = (id: string) => drivers.find(d => d.id === id);
+          const inits = (name: string) => name.split(' ').map(w => w[0]).slice(0, 2).join('');
+          const onDropToCar = (carNumber: string, e: React.DragEvent) => {
+            e.preventDefault(); setDragOverZone(null);
+            const id = e.dataTransfer.getData('driverId');
+            if (id) assignDraft(carNumber, id);
+          };
+          const onDropToPool = (e: React.DragEvent) => {
+            e.preventDefault(); setDragOverZone(null);
+            const id = e.dataTransfer.getData('driverId');
+            const d = drafts.find(x => x.incomingDriverId === id);
+            if (d) removeDraft(d.carNumber);
+          };
+          const driverChip = (d: Driver, from: string) => (
+            <div
+              draggable
+              onDragStart={e => { e.dataTransfer.setData('driverId', d.id); e.dataTransfer.setData('from', from); e.dataTransfer.effectAllowed = 'move'; }}
+              className="group flex items-center gap-2.5 bg-surface border border-hairline rounded-xl px-2.5 py-2 cursor-grab active:cursor-grabbing hover:border-ink/30 hover:shadow-card transition-all select-none"
+            >
+              <GripVertical size={14} className="text-stone-300 group-hover:text-stone-400 shrink-0" />
+              <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0", "bg-emerald-100 text-emerald-700")}>{inits(d.name)}</div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-semibold truncate leading-tight">{d.name}</p>
+                <p className="text-[10px] text-muted truncate">{d.companyType} · {t(d.specialization)}{d.readinessDate ? ` · ${t('Galima')} ${d.readinessDate}` : ''}</p>
+              </div>
+            </div>
+          );
+          return (
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              {/* Laisvų vairuotojų baseinas */}
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOverZone('pool'); }}
+                onDragLeave={() => setDragOverZone(z => z === 'pool' ? null : z)}
+                onDrop={onDropToPool}
+                className={cn("lg:col-span-1 bg-canvas/40 rounded-2xl border p-3 self-start", dragOverZone === 'pool' ? "border-gold ring-1 ring-gold/30" : "border-hairline")}
+              >
+                <div className="flex items-center gap-2 px-2 py-1.5 mb-2">
+                  <Users size={15} className="text-emerald-500" />
+                  <p className="text-sm font-semibold">{t('Laisvi vairuotojai')}</p>
+                  <span className="text-xs text-muted">· {pool.length}</span>
+                </div>
+                <div className="space-y-2 min-h-[80px]">
+                  {pool.map(d => <div key={d.id}>{driverChip(d, 'pool')}</div>)}
+                  {pool.length === 0 && <p className="text-xs text-muted text-center py-8">{t('Visi vairuotojai paskirstyti')}</p>}
+                </div>
+              </div>
+
+              {/* Mašinos su drop zonomis */}
+              <div className="lg:col-span-2">
+                <div className="flex items-center gap-2 px-1 mb-2">
+                  <Truck size={15} className="text-ink/70" />
+                  <p className="text-sm font-semibold">{t('Mašinos')}</p>
+                  <span className="text-xs text-muted">· {boardCars.length}</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {boardCars.map(car => {
+                    const leaving = drivers.find(d => d.currentCar === car.number && d.status === 'Reise');
+                    const dr = draftFor(car.number);
+                    const incoming = dr ? driverById(dr.incomingDriverId) : undefined;
+                    const ready = !!incoming;
+                    return (
+                      <div
+                        key={car.id}
+                        onDragOver={e => { e.preventDefault(); setDragOverZone(car.number); }}
+                        onDragLeave={() => setDragOverZone(z => z === car.number ? null : z)}
+                        onDrop={e => onDropToCar(car.number, e)}
+                        className={cn("rounded-2xl border p-3 transition-all", dragOverZone === car.number ? "border-gold ring-2 ring-gold/30 bg-gold/[0.03]" : ready ? "border-emerald-200 bg-emerald-50/40" : "border-hairline bg-surface")}
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", car.status === 'Aktyvus' ? "bg-ink text-gold-soft" : "bg-red-50 text-red-400")}>{car.type === 'Refas' ? <Snowflake className="w-4 h-4" /> : <Container className="w-4 h-4" />}</div>
+                          <div className="min-w-0">
+                            <p className="font-mono font-bold text-sm leading-tight">{car.number}</p>
+                            <p className="text-[10px] text-muted">{[t(car.type), car.brand].filter(Boolean).join(' · ')}</p>
+                          </div>
+                          {ready && <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600"><CheckCircle2 size={12} />{t('Keitimas paruoštas')}</span>}
+                        </div>
+
+                        {/* Nuima (dabartinis) */}
+                        <div className="flex items-center gap-2 text-[11px] text-muted mb-1.5">
+                          <span className="uppercase tracking-wide text-[9px] font-bold text-stone-400 w-12 shrink-0">{t('Dabar')}</span>
+                          {leaving ? <span className="font-medium text-ink/80">{leaving.name}</span> : <span className="italic">{t('Laisva')}</span>}
+                        </div>
+
+                        {/* Pakeičia (drop) */}
+                        <div className="flex items-center gap-2">
+                          <span className="uppercase tracking-wide text-[9px] font-bold text-stone-400 w-12 shrink-0">{t('Naujas')}</span>
+                          {incoming
+                            ? <div className="flex-1 flex items-center gap-1">{driverChip(incoming, car.number)}<button onClick={() => removeDraft(car.number)} className="p-1.5 text-muted hover:text-red-500 transition-colors shrink-0"><X size={13} /></button></div>
+                            : <div className="flex-1 border-2 border-dashed border-hairline rounded-xl px-3 py-2.5 text-center text-[11px] text-stone-400">{t('Vilkite čia vairuotoją')}</div>}
+                        </div>
+
+                        {dr && (
+                          <div className="mt-2 pt-2 border-t border-hairline flex items-center gap-2">
+                            <span className="text-[10px] text-muted">{t('Keitimo data')}</span>
+                            <input type="date" value={dr.date} onChange={e => setDraftDate(car.number, e.target.value)} className="text-xs bg-canvas border border-hairline rounded-lg px-2 py-1 focus:outline-none focus:border-ink/40" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Peržiūra + patvirtinimas */}
+            <div className="bg-surface rounded-2xl border border-hairline p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Check size={16} className="text-gold" />
+                  <p className="text-sm font-semibold">{t('Peržiūra')}</p>
+                  <span className="text-xs text-muted">· {drafts.length} {drafts.length === 1 ? t('keitimas') : t('keitimai')}</span>
+                </div>
+                {drafts.length > 0 && <button onClick={clearDrafts} className="text-xs text-muted hover:text-red-500 transition-colors">{t('Išvalyti juodraštį')}</button>}
+              </div>
+              {drafts.length === 0
+                ? <p className="text-sm text-muted text-center py-6">{t('Juodraštyje keitimų nėra')}</p>
+                : (
+                  <div className="space-y-2">
+                    {drafts.map(dr => {
+                      const car = cars.find(c => c.number === dr.carNumber);
+                      const incoming = driverById(dr.incomingDriverId);
+                      const leaving = drivers.find(d => d.currentCar === dr.carNumber && d.status === 'Reise');
+                      return (
+                        <div key={dr.carNumber} className="flex items-center gap-3 bg-canvas/50 border border-hairline rounded-xl px-3 py-2.5 text-sm">
+                          <span className="font-mono font-bold bg-ink/[0.06] px-2 py-0.5 rounded shrink-0">{dr.carNumber}</span>
+                          {car && <span className="text-[10px] text-muted hidden sm:inline">{t(car.type)}</span>}
+                          <span className="flex items-center gap-2 min-w-0 flex-1 justify-center">
+                            <span className="text-red-500/80 truncate">{leaving ? `${t('Nuima')}: ${leaving.name}` : t('Laisva')}</span>
+                            <ArrowRight size={14} className="text-muted shrink-0" />
+                            <span className="text-emerald-600 font-semibold truncate">{incoming?.name}</span>
+                          </span>
+                          <span className="font-mono text-xs text-muted shrink-0">{dr.date}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              <button
+                onClick={confirmDrafts}
+                disabled={drafts.length === 0}
+                className="w-full mt-4 inline-flex items-center justify-center gap-2 bg-ink text-white py-3 rounded-xl text-sm font-bold hover:bg-ink/85 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <CheckCircle2 size={16} /> {t('Patvirtinti ir suplanuoti')}
+              </button>
+            </div>
+          </div>
+          );
+        })()}
 
         {/* ══════════════════ KOORDINATORIUS (keitimo taškai) ══════════════════ */}
         {activeTab === 'coordinator' && (
