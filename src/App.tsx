@@ -13,7 +13,7 @@ import {
   isSameWeek, startOfMonth, endOfMonth, eachDayOfInterval,
   isSameDay, addMonths, subMonths, isSameMonth, getDaysInMonth
 } from 'date-fns';
-import { lt } from 'date-fns/locale';
+import { lt, ru } from 'date-fns/locale';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { supabase, isSupabaseEnabled } from './lib/supabase';
@@ -23,6 +23,7 @@ import CoordinatorBoard from './components/CoordinatorBoard';
 import { EmptyRoad, EmptyChecklist, SemiTruck, EuropeMap } from './components/illustrations';
 import { parseDriverWorkbook, mergeIntoDriver, buildDriverIndex, findExisting, buildDriverTemplate, type ParsedDriver } from './lib/importDrivers';
 import { parseCarWorkbook, mergeIntoCar, buildCarIndex, findExistingCar, buildCarTemplate, type ParsedCar } from './lib/importCars';
+import { useLang, useT, useDateLocale, type Lang } from './lib/i18n';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
   ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment, TaskPoint, CalendarNote
@@ -207,6 +208,9 @@ function NavItem({ active, onClick, icon, label, badge }: { active: boolean; onC
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
+  const { lang, setLang } = useLang();
+  const t = useT();
+  const dfLocale = lang === 'ru' ? ru : lt;
   const [drivers, setDrivers]           = useState<Driver[]>([]);
   const [cars, setCars]                 = useState<Car[]>([]);
   const [history, setHistory]           = useState<HistoryEntry[]>([]);
@@ -922,17 +926,17 @@ export default function App() {
     );
   }
 
-  const go = (t: Tab) => { setActiveTab(t); setSidebarOpen(false); };
+  const go = (tab: Tab) => { setActiveTab(tab); setSidebarOpen(false); };
   const pageMeta: Record<Tab, { title: string; subtitle: string }> = {
-    dashboard:       { title: 'Skydelis',     subtitle: 'Bendra parko ir vairuotojų apžvalga' },
-    planning:        { title: 'Planavimas',   subtitle: 'Keitimų planavimas ir rekomendacijos' },
-    drivers:         { title: 'Vairuotojai',  subtitle: `${drivers.length} vairuotojai · ${reiseDrivers.length} reise, ${namuoseDrivers.length} namuose` },
-    cars:            { title: 'Automobiliai', subtitle: `${cars.length} mašinos parke` },
-    history:         { title: 'Istorija',     subtitle: 'Visų veiksmų žurnalas' },
-    calendar:        { title: 'Kalendorius',  subtitle: 'Keitimai pagal mėnesį' },
-    'auto-grafikas': { title: 'Grafikas',     subtitle: 'Automobilių užimtumo juosta' },
-    coordinator:     { title: 'Koordinatorius', subtitle: 'Keitimo taškai žemėlapyje — eina į Kelionę' },
-    trip:            { title: 'Kelionė',      subtitle: 'Maršrutų ir keitimo logistika' },
+    dashboard:       { title: t('Skydelis'),     subtitle: t('Bendra parko ir vairuotojų apžvalga') },
+    planning:        { title: t('Planavimas'),   subtitle: t('Keitimų planavimas ir rekomendacijos') },
+    drivers:         { title: t('Vairuotojai'),  subtitle: `${drivers.length} ${t('vairuotojai')} · ${reiseDrivers.length} ${t('reise')}, ${namuoseDrivers.length} ${t('namuose')}` },
+    cars:            { title: t('Automobiliai'), subtitle: `${cars.length} ${t('mašinos parke')}` },
+    history:         { title: t('Istorija'),     subtitle: t('Visų veiksmų žurnalas') },
+    calendar:        { title: t('Kalendorius'),  subtitle: t('Keitimai pagal mėnesį') },
+    'auto-grafikas': { title: t('Grafikas'),     subtitle: t('Automobilių užimtumo juosta') },
+    coordinator:     { title: t('Koordinatorius'), subtitle: t('Keitimo taškai žemėlapyje — eina į Kelionę') },
+    trip:            { title: t('Kelionė'),      subtitle: t('Maršrutų ir keitimo logistika') },
   };
   const meta = pageMeta[activeTab];
 
@@ -957,22 +961,22 @@ export default function App() {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
-          <NavGroup label="Apžvalga">
-            <NavItem active={activeTab === 'dashboard'} onClick={() => go('dashboard')} icon={<LayoutDashboard size={17}/>} label="Skydelis" />
+          <NavGroup label={t('Apžvalga')}>
+            <NavItem active={activeTab === 'dashboard'} onClick={() => go('dashboard')} icon={<LayoutDashboard size={17}/>} label={t('Skydelis')} />
           </NavGroup>
-          <NavGroup label="Operacijos">
-            <NavItem active={activeTab === 'planning'} onClick={() => go('planning')} icon={<ArrowRightLeft size={17}/>} label="Planavimas" badge={urgentCount} />
-            <NavItem active={activeTab === 'calendar'} onClick={() => go('calendar')} icon={<Calendar size={17}/>} label="Kalendorius" />
-            <NavItem active={activeTab === 'auto-grafikas'} onClick={() => go('auto-grafikas')} icon={<LayoutDashboard size={17}/>} label="Grafikas" />
-            <NavItem active={activeTab === 'coordinator'} onClick={() => go('coordinator')} icon={<MapPin size={17}/>} label="Koordinatorius" badge={coordinatorPending} />
-            <NavItem active={activeTab === 'trip'} onClick={() => go('trip')} icon={<MapIcon size={17}/>} label="Kelionė" />
+          <NavGroup label={t('Operacijos')}>
+            <NavItem active={activeTab === 'planning'} onClick={() => go('planning')} icon={<ArrowRightLeft size={17}/>} label={t('Planavimas')} badge={urgentCount} />
+            <NavItem active={activeTab === 'calendar'} onClick={() => go('calendar')} icon={<Calendar size={17}/>} label={t('Kalendorius')} />
+            <NavItem active={activeTab === 'auto-grafikas'} onClick={() => go('auto-grafikas')} icon={<LayoutDashboard size={17}/>} label={t('Grafikas')} />
+            <NavItem active={activeTab === 'coordinator'} onClick={() => go('coordinator')} icon={<MapPin size={17}/>} label={t('Koordinatorius')} badge={coordinatorPending} />
+            <NavItem active={activeTab === 'trip'} onClick={() => go('trip')} icon={<MapIcon size={17}/>} label={t('Kelionė')} />
           </NavGroup>
-          <NavGroup label="Katalogas">
-            <NavItem active={activeTab === 'drivers'} onClick={() => go('drivers')} icon={<Users size={17}/>} label="Vairuotojai" />
-            <NavItem active={activeTab === 'cars'} onClick={() => go('cars')} icon={<Truck size={17}/>} label="Automobiliai" />
+          <NavGroup label={t('Katalogas')}>
+            <NavItem active={activeTab === 'drivers'} onClick={() => go('drivers')} icon={<Users size={17}/>} label={t('Vairuotojai')} />
+            <NavItem active={activeTab === 'cars'} onClick={() => go('cars')} icon={<Truck size={17}/>} label={t('Automobiliai')} />
           </NavGroup>
-          <NavGroup label="Žurnalas">
-            <NavItem active={activeTab === 'history'} onClick={() => go('history')} icon={<History size={17}/>} label="Istorija" />
+          <NavGroup label={t('Žurnalas')}>
+            <NavItem active={activeTab === 'history'} onClick={() => go('history')} icon={<History size={17}/>} label={t('Istorija')} />
           </NavGroup>
         </nav>
 
@@ -984,11 +988,11 @@ export default function App() {
         <div className="px-3 py-3 border-t border-hairline shrink-0">
           <div className="flex items-center gap-2 px-4 py-1.5 text-[11px] text-muted">
             <span className={cn("w-1.5 h-1.5 rounded-full", isSupabaseEnabled ? "bg-emerald-400" : "bg-stone-300")} />
-            {isSupabaseEnabled ? 'Supabase debesis' : 'Vietinė saugykla'}
+            {isSupabaseEnabled ? t('Supabase debesis') : t('Vietinė saugykla')}
           </div>
           {isSupabaseEnabled && (
             <button onClick={() => { void supabase?.auth.signOut(); }} className="w-full flex items-center gap-3 pl-4 pr-3 py-2 rounded-xl text-sm font-medium text-muted hover:text-ink hover:bg-ink/[0.03] transition-all">
-              <LogOut size={17}/> Atsijungti
+              <LogOut size={17}/> {t('Atsijungti')}
             </button>
           )}
         </div>
@@ -1006,14 +1010,22 @@ export default function App() {
             </div>
             <div className="flex-1" />
             <div className="flex items-center gap-2">
+              {/* Kalbos perjungiklis LT / RU */}
+              <div className="flex items-center bg-ink/[0.06] rounded-full p-0.5" role="group" aria-label={t('Kalba')}>
+                {(['lt', 'ru'] as Lang[]).map(l => (
+                  <button key={l} onClick={() => setLang(l)} className={cn('px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide transition-all', lang === l ? 'bg-ink text-white shadow-card' : 'text-muted hover:text-ink')}>
+                    {l === 'lt' ? 'LT' : 'RU'}
+                  </button>
+                ))}
+              </div>
               {(activeTab === 'cars' || activeTab === 'dashboard') && (
                 <button onClick={() => setAddCarOpen(true)} className="flex items-center gap-1.5 bg-surface border border-hairline text-ink px-3.5 py-2 rounded-full text-xs font-medium hover:border-ink/25 transition-all">
-                  <Plus size={14}/><span className="hidden sm:inline">Automobilis</span>
+                  <Plus size={14}/><span className="hidden sm:inline">{t('Automobilis')}</span>
                 </button>
               )}
               {(activeTab === 'drivers' || activeTab === 'dashboard' || activeTab === 'planning') && (
                 <button onClick={() => setAddDriverOpen(true)} className="flex items-center gap-1.5 bg-ink text-white px-3.5 py-2 rounded-full text-xs font-medium hover:bg-ink/85 transition-all">
-                  <UserPlus size={14}/><span className="hidden sm:inline">Vairuotojas</span>
+                  <UserPlus size={14}/><span className="hidden sm:inline">{t('Vairuotojas')}</span>
                 </button>
               )}
             </div>
@@ -1031,38 +1043,38 @@ export default function App() {
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-surface via-surface to-canvas" />
               <div className="relative px-6 sm:px-9 py-7 sm:py-9 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                 <div>
-                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-gold">{format(new Date(), "EEEE, MMMM d", { locale: lt })}</p>
+                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-gold">{format(new Date(), "EEEE, MMMM d", { locale: dfLocale })}</p>
                   <h2 className="font-display text-3xl sm:text-4xl font-medium tracking-tight mt-1.5 text-ink">
-                    {(() => { const h = new Date().getHours(); return h < 12 ? 'Labas rytas' : h < 18 ? 'Laba diena' : 'Labas vakaras'; })()}
+                    {(() => { const h = new Date().getHours(); return t(h < 12 ? 'Labas rytas' : h < 18 ? 'Laba diena' : 'Labas vakaras'); })()}
                   </h2>
-                  <p className="text-sm text-muted mt-2">Bendra parko ir vairuotojų apžvalga</p>
+                  <p className="text-sm text-muted mt-2">{t('Bendra parko ir vairuotojų apžvalga')}</p>
                 </div>
                 {/* Greita santrauka — elegantiškos pilės */}
                 <div className="flex items-center gap-2.5">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 text-blue-700 px-3 py-1.5 text-xs font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-blue-400" />{reiseDrivers.length} reise</span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 text-emerald-700 px-3 py-1.5 text-xs font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{namuoseDrivers.length} namuose</span>
-                  {urgentCount > 0 && <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 text-red-600 px-3 py-1.5 text-xs font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-red-400" />{urgentCount} skubu</span>}
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 text-blue-700 px-3 py-1.5 text-xs font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-blue-400" />{reiseDrivers.length} {t('reise')}</span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 text-emerald-700 px-3 py-1.5 text-xs font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{namuoseDrivers.length} {t('namuose')}</span>
+                  {urgentCount > 0 && <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 text-red-600 px-3 py-1.5 text-xs font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-red-400" />{urgentCount} {t('skubu')}</span>}
                 </div>
               </div>
             </div>
 
             {/* Stats Row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <StatCard label="Reise"        value={reiseDrivers.length}   sub={`iš ${drivers.length} viso`}          accent="bg-blue-400"    onClick={() => setActiveTab('drivers')} art={<SemiTruck className="w-28 h-auto" stroke="currentColor" />} />
-              <StatCard label="Namuose"      value={namuoseDrivers.length} sub="laukia darbo"                          accent="bg-emerald-400" onClick={() => setActiveTab('drivers')} art={<Home size={92} strokeWidth={1.2} />} />
-              <StatCard label="Planai"       value={activePlans.length}    sub="suplanuota"                            accent="bg-violet-400"  onClick={() => setActiveTab('planning')} art={<ArrowRightLeft size={88} strokeWidth={1.1} />} />
-              <StatCard label="Skubu"        value={urgentCount}           sub="reikia keitimo ≤7d"                   accent={urgentCount > 0 ? "bg-red-400" : "bg-stone-300"} onClick={() => setActiveTab('planning')} art={<AlertCircle size={88} strokeWidth={1.1} />} />
+              <StatCard label={t('Reise')}        value={reiseDrivers.length}   sub={`${t('iš')} ${drivers.length} ${t('viso')}`}   accent="bg-blue-400"    onClick={() => setActiveTab('drivers')} art={<SemiTruck className="w-28 h-auto" stroke="currentColor" />} />
+              <StatCard label={t('Namuose')}      value={namuoseDrivers.length} sub={t('laukia darbo')}                     accent="bg-emerald-400" onClick={() => setActiveTab('drivers')} art={<Home size={92} strokeWidth={1.2} />} />
+              <StatCard label={t('Planai')}       value={activePlans.length}    sub={t('suplanuota')}                       accent="bg-violet-400"  onClick={() => setActiveTab('planning')} art={<ArrowRightLeft size={88} strokeWidth={1.1} />} />
+              <StatCard label={t('Skubu')}        value={urgentCount}           sub={t('reikia keitimo ≤7d')}              accent={urgentCount > 0 ? "bg-red-400" : "bg-stone-300"} onClick={() => setActiveTab('planning')} art={<AlertCircle size={88} strokeWidth={1.1} />} />
             </div>
 
             {/* Planned Replacements */}
             <section>
-              <SectionHeader icon={<ArrowRightLeft size={18} className="text-blue-500"/>} title="Suplanuoti keitimai">
+              <SectionHeader icon={<ArrowRightLeft size={18} className="text-blue-500"/>} title={t('Suplanuoti keitimai')}>
                 <MonthNav value={selectedMonth} onChange={setSelectedMonth} />
               </SectionHeader>
 
               {(() => {
                 const monthPlans = activePlans.filter(p => isSameMonth(parseISO(p.date), selectedMonth) && cars.some(c => c.number === p.carNumber));
-                if (monthPlans.length === 0) return <EmptyState icon={<Calendar size={28}/>} text="Šį mėnesį suplanuotų keitimų nėra" />;
+                if (monthPlans.length === 0) return <EmptyState icon={<Calendar size={28}/>} text={t('Šį mėnesį suplanuotų keitimų nėra')} />;
 
                 const byWeek: Record<string, { start: Date; plans: ReplacementPlan[] }> = {};
                 monthPlans.forEach(p => {
@@ -1079,7 +1091,7 @@ export default function App() {
                       <div key={k}>
                         <div className="flex items-center gap-3 mb-4">
                           <span className="text-[10px] font-black uppercase tracking-widest text-stone-400 bg-stone-200 px-3 py-1 rounded-full">
-                            Savaitė {format(start, 'MM.dd')} – {format(endOfWeek(start, { weekStartsOn: 1 }), 'MM.dd')}
+                            {t('Savaitė')} {format(start, 'MM.dd')} – {format(endOfWeek(start, { weekStartsOn: 1 }), 'MM.dd')}
                           </span>
                           <div className="h-px flex-1 bg-stone-200" />
                         </div>
@@ -1107,9 +1119,9 @@ export default function App() {
 
             {/* Drivers at Home */}
             <section>
-              <SectionHeader icon={<Home size={18} className="text-emerald-500"/>} title="Vairuotojai namuose" />
+              <SectionHeader icon={<Home size={18} className="text-emerald-500"/>} title={t('Vairuotojai namuose')} />
               {namuoseDrivers.length === 0
-                ? <EmptyState icon={<Users size={28}/>} text="Visi vairuotojai reise" />
+                ? <EmptyState icon={<Users size={28}/>} text={t('Visi vairuotojai reise')} />
                 : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-2">
                     {namuoseDrivers.map(d => (
@@ -1123,7 +1135,7 @@ export default function App() {
             {/* Reise drivers urgency */}
             {urgentCount > 0 && (
               <section>
-                <SectionHeader icon={<AlertCircle size={18} className="text-red-500"/>} title="Reikia keitimo (≤7 dienų)" />
+                <SectionHeader icon={<AlertCircle size={18} className="text-red-500"/>} title={t('Reikia keitimo (≤7 dienų)')} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {reiseDrivers.filter(d => {
                     if (!d.plannedReturnDate) return false;
@@ -1132,11 +1144,11 @@ export default function App() {
                     <div key={d.id} className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center justify-between gap-3">
                       <div>
                         <p className="font-bold text-sm">{d.name}</p>
-                        <p className="text-xs text-red-600 font-semibold">{d.currentCar} — grįžta: {d.plannedReturnDate}</p>
-                        <p className="text-[10px] text-red-400 mt-0.5">Liko {differenceInDays(parseISO(d.plannedReturnDate!), new Date())} d.</p>
+                        <p className="text-xs text-red-600 font-semibold">{d.currentCar} — {t('grįžta')}: {d.plannedReturnDate}</p>
+                        <p className="text-[10px] text-red-400 mt-0.5">{t('Liko')} {differenceInDays(parseISO(d.plannedReturnDate!), new Date())} {t('d.')}</p>
                       </div>
                       <button onClick={() => { setSelectedTripDriverId(d.id); setActiveTab('planning'); }} className="bg-red-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-red-700 transition-colors whitespace-nowrap">
-                        Planuoti
+                        {t('Planuoti')}
                       </button>
                     </div>
                   ))}
@@ -1146,7 +1158,7 @@ export default function App() {
 
             {/* Timeline */}
             <section>
-              <SectionHeader icon={<LayoutDashboard size={18} className="text-violet-500"/>} title="Vairuotojų grafikas">
+              <SectionHeader icon={<LayoutDashboard size={18} className="text-violet-500"/>} title={t('Vairuotojų grafikas')}>
                 <MonthNav value={selectedMonth} onChange={setSelectedMonth} />
               </SectionHeader>
               <DriverTimeline drivers={drivers} cars={cars} plans={plans} carAssignments={carAssignments} month={selectedMonth} onEditAssignment={setEditAssignment} onMoveAssignment={moveAssignment} onMovePlanDate={movePlanDate} onMovePlanToCar={movePlanToCar} onResizeAssignment={resizeAssignment} />
@@ -1407,23 +1419,23 @@ export default function App() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <p className="font-semibold text-sm truncate">{d.name}</p>
-                      {isLate && <Badge variant="red">Vėluoja</Badge>}
+                      {isLate && <Badge variant="red">{t('Vėluoja')}</Badge>}
                     </div>
-                    <p className="text-[11px] text-muted truncate">{d.companyType} · {d.specialization}</p>
+                    <p className="text-[11px] text-muted truncate">{d.companyType} · {t(d.specialization)}</p>
                     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                      <Badge variant={d.status === 'Reise' ? 'blue' : 'green'}>{d.status}</Badge>
+                      <Badge variant={d.status === 'Reise' ? 'blue' : 'green'}>{t(d.status)}</Badge>
                       {d.currentCar !== 'Nėra' && <span className="font-mono text-[10px] text-muted">{d.currentCar}</span>}
-                      {plan && <span className="text-[9px] text-violet-600 font-bold">PLANAS</span>}
+                      {plan && <span className="text-[9px] text-violet-600 font-bold">{t('PLANAS')}</span>}
                     </div>
                   </div>
                   <input type="checkbox" onClick={e => e.stopPropagation()} checked={sel} onChange={() => toggleSel(d.id)} className="accent-gold mt-0.5 w-4 h-4" />
                 </div>
                 <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-hairline">
-                  <span className="text-[11px] text-muted">{d.status === 'Reise' ? `Grįžta ${d.plannedReturnDate || '?'}` : `Laisvas ${d.readinessDate || '?'}`}</span>
+                  <span className="text-[11px] text-muted">{d.status === 'Reise' ? `${t('Grįžta')} ${d.plannedReturnDate || '?'}` : `${t('Laisvas')} ${d.readinessDate || '?'}`}</span>
                   <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
                     {d.status === 'Reise'
-                      ? <button onClick={() => { setSelectedDriverForHome(d); setHomeOpen(true); }} className="px-2 py-1 bg-emerald-500 text-white text-[10px] font-bold rounded-md hover:bg-emerald-600 transition-colors">Namo</button>
-                      : <button onClick={() => { setSelectedDriverForTrip(d); setTripOpen(true); }} className="px-2 py-1 bg-ink text-white text-[10px] font-bold rounded-md hover:bg-ink/85 transition-colors">Į reisą</button>}
+                      ? <button onClick={() => { setSelectedDriverForHome(d); setHomeOpen(true); }} className="px-2 py-1 bg-emerald-500 text-white text-[10px] font-bold rounded-md hover:bg-emerald-600 transition-colors">{t('Namo')}</button>
+                      : <button onClick={() => { setSelectedDriverForTrip(d); setTripOpen(true); }} className="px-2 py-1 bg-ink text-white text-[10px] font-bold rounded-md hover:bg-ink/85 transition-colors">{t('Į reisą')}</button>}
                     <button onClick={() => { setSelectedDriverForEdit(d); setEditDriverOpen(true); }} className="p-1.5 bg-ink/[0.05] text-ink rounded-md hover:bg-ink hover:text-white transition-all"><Edit size={12} /></button>
                   </div>
                 </div>
@@ -1437,28 +1449,28 @@ export default function App() {
               <div className="flex bg-ink/[0.06] p-1 rounded-xl self-start">
                 {([['table', 'Lentelė', List], ['kanban', 'Kanban', Columns3], ['cards', 'Kortelės', LayoutGrid]] as const).map(([v, label, Icon]) => (
                   <button key={v} onClick={() => setDriverView(v)} className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all', driverView === v ? 'bg-surface shadow-card text-ink' : 'text-muted hover:text-ink')}>
-                    <Icon size={14} /> {label}
+                    <Icon size={14} /> {t(label)}
                   </button>
                 ))}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {selectedDriverIds.length > 0 && (
                   <div className="flex items-center gap-1.5 mr-1">
-                    <span className="text-xs font-semibold text-ink bg-gold/15 px-2.5 py-1.5 rounded-lg">{selectedList.length} pasirinkta</span>
-                    <button onClick={() => emailDrivers(selectedList)} title="Siųsti el. paštu" className="p-2 rounded-lg bg-ink/[0.06] hover:bg-ink hover:text-white transition-all"><Mail size={14} /></button>
-                    <button onClick={() => exportDriversCSV(selectedList)} title="Eksportuoti CSV" className="p-2 rounded-lg bg-ink/[0.06] hover:bg-ink hover:text-white transition-all"><Download size={14} /></button>
-                    <button onClick={() => setSelectedDriverIds([])} title="Išvalyti" className="p-2 rounded-lg text-muted hover:text-red-500 transition-colors"><X size={14} /></button>
+                    <span className="text-xs font-semibold text-ink bg-gold/15 px-2.5 py-1.5 rounded-lg">{selectedList.length} {t('pasirinkta')}</span>
+                    <button onClick={() => emailDrivers(selectedList)} title={t('Siųsti el. paštu')} className="p-2 rounded-lg bg-ink/[0.06] hover:bg-ink hover:text-white transition-all"><Mail size={14} /></button>
+                    <button onClick={() => exportDriversCSV(selectedList)} title={t('Eksportuoti CSV')} className="p-2 rounded-lg bg-ink/[0.06] hover:bg-ink hover:text-white transition-all"><Download size={14} /></button>
+                    <button onClick={() => setSelectedDriverIds([])} title={t('Išvalyti')} className="p-2 rounded-lg text-muted hover:text-red-500 transition-colors"><X size={14} /></button>
                   </div>
                 )}
                 <select className={cn(selectCls, 'w-auto')} value={driverFilter.companyType} onChange={e => setDriverFilter(p => ({ ...p, companyType: e.target.value as RegistrationType | '' }))}>
-                  <option value="">Visos įmonės</option><option value="LT">LT</option><option value="PL">PL</option>
+                  <option value="">{t('Visos įmonės')}</option><option value="LT">LT</option><option value="PL">PL</option>
                 </select>
                 <select className={cn(selectCls, 'w-auto')} value={driverFilter.specialization} onChange={e => setDriverFilter(p => ({ ...p, specialization: e.target.value as DriverSpecialization | '' }))}>
-                  <option value="">Visi tipai</option><option value="Tentas">Tentas</option><option value="Refas">Refas</option><option value="Universalus">Universalus</option>
+                  <option value="">{t('Visi tipai')}</option><option value="Tentas">{t('Tentas')}</option><option value="Refas">{t('Refas')}</option><option value="Universalus">{t('Universalus')}</option>
                 </select>
-                <input placeholder="Paieška..." className={cn(inputCls, 'w-36')} value={driverFilter.search} onChange={e => setDriverFilter(p => ({ ...p, search: e.target.value }))} />
-                <button onClick={() => exportDriversCSV(fd)} title="Eksportuoti visus į CSV" className="p-2 rounded-lg border border-hairline text-muted hover:text-ink hover:border-ink/30 transition-all"><Download size={15} /></button>
-                <button onClick={() => { setImportRows([]); setImportMeta(null); setImportErr(null); setImportOpen(true); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ink text-white text-xs font-semibold hover:bg-ink/85 transition-all"><Upload size={14} /> Importuoti Excel</button>
+                <input placeholder={t('Paieška...')} className={cn(inputCls, 'w-36')} value={driverFilter.search} onChange={e => setDriverFilter(p => ({ ...p, search: e.target.value }))} />
+                <button onClick={() => exportDriversCSV(fd)} title={t('Eksportuoti visus į CSV')} className="p-2 rounded-lg border border-hairline text-muted hover:text-ink hover:border-ink/30 transition-all"><Download size={15} /></button>
+                <button onClick={() => { setImportRows([]); setImportMeta(null); setImportErr(null); setImportOpen(true); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ink text-white text-xs font-semibold hover:bg-ink/85 transition-all"><Upload size={14} /> {t('Importuoti Excel')}</button>
               </div>
             </div>
 
@@ -1469,12 +1481,12 @@ export default function App() {
                   <thead>
                     <tr className="bg-ink text-white text-left">
                       <th className="pl-4 pr-2 py-3 w-9"><input type="checkbox" checked={allSel} onChange={() => setSelectedDriverIds(allSel ? [] : fd.map(d => d.id))} className="accent-gold w-4 h-4 align-middle" /></th>
-                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Vairuotojas</th>
-                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Įmonė / Tipas</th>
-                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Būsena</th>
-                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Auto</th>
-                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Data</th>
-                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold text-right">Veiksmai</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">{t('Vairuotojas')}</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">{t('Įmonė / Tipas')}</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">{t('Būsena')}</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">{t('Auto')}</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">{t('Data')}</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold text-right">{t('Veiksmai')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
@@ -1489,19 +1501,19 @@ export default function App() {
                               <div><div className="font-semibold flex items-center gap-1.5">{d.name}{(() => { const w = worstDocState(d); return w === 'expired' ? <span title="Dokumentai pasibaigę"><ShieldAlert size={13} className="text-red-500" /></span> : w === 'soon' ? <span title="Dokumentai netrukus baigiasi"><ShieldAlert size={13} className="text-amber-500" /></span> : null; })()}</div><div className="text-[10px] text-stone-400 font-mono">{d.phone}</div></div>
                             </div>
                           </td>
-                          <td className="px-4 py-3"><div className="flex gap-1.5"><Badge>{d.companyType}</Badge><Badge variant="blue">{d.specialization}</Badge></div></td>
+                          <td className="px-4 py-3"><div className="flex gap-1.5"><Badge>{d.companyType}</Badge><Badge variant="blue">{t(d.specialization)}</Badge></div></td>
                           <td className="px-4 py-3">
-                            <Badge variant={d.status === 'Reise' ? 'blue' : 'green'}>{d.status}</Badge>
-                            {plan && <span className="ml-1.5 text-[9px] text-violet-600 font-bold">PLANAS</span>}
-                            {isLate && <span className="ml-1.5"><Badge variant="red">Vėluoja</Badge></span>}
+                            <Badge variant={d.status === 'Reise' ? 'blue' : 'green'}>{t(d.status)}</Badge>
+                            {plan && <span className="ml-1.5 text-[9px] text-violet-600 font-bold">{t('PLANAS')}</span>}
+                            {isLate && <span className="ml-1.5"><Badge variant="red">{t('Vėluoja')}</Badge></span>}
                           </td>
                           <td className="px-4 py-3 font-mono text-xs font-bold">{d.currentCar}</td>
-                          <td className="px-4 py-3 text-xs">{d.status === 'Reise' ? <span className="text-stone-500">Grįžta: <strong>{d.plannedReturnDate || '?'}</strong></span> : <span className="text-stone-500">Gali: <strong>{d.readinessDate || '?'}</strong></span>}</td>
+                          <td className="px-4 py-3 text-xs">{d.status === 'Reise' ? <span className="text-stone-500">{t('Grįžta')}: <strong>{d.plannedReturnDate || '?'}</strong></span> : <span className="text-stone-500">{t('Gali')}: <strong>{d.readinessDate || '?'}</strong></span>}</td>
                           <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                             <div className="flex justify-end gap-1.5">
                               {d.status === 'Reise'
-                                ? <button onClick={() => { setSelectedDriverForHome(d); setHomeOpen(true); }} className="px-2.5 py-1 bg-emerald-500 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-600 transition-colors">Namo</button>
-                                : <button onClick={() => { setSelectedDriverForTrip(d); setTripOpen(true); }} className="px-2.5 py-1 bg-ink text-white text-[10px] font-bold rounded-lg hover:bg-ink/85 transition-colors">Į reisą</button>}
+                                ? <button onClick={() => { setSelectedDriverForHome(d); setHomeOpen(true); }} className="px-2.5 py-1 bg-emerald-500 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-600 transition-colors">{t('Namo')}</button>
+                                : <button onClick={() => { setSelectedDriverForTrip(d); setTripOpen(true); }} className="px-2.5 py-1 bg-ink text-white text-[10px] font-bold rounded-lg hover:bg-ink/85 transition-colors">{t('Į reisą')}</button>}
                               <button onClick={() => { setSelectedDriverForEdit(d); setEditDriverOpen(true); }} className="p-1.5 bg-ink/[0.05] text-ink hover:bg-ink hover:text-white rounded-lg transition-all"><Edit size={13} /></button>
                               <button onClick={() => deleteDriver(d.id)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Trash2 size={13} /></button>
                             </div>
@@ -1509,7 +1521,7 @@ export default function App() {
                         </tr>
                       );
                     })}
-                    {fd.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-muted text-sm">Nieko nerasta</td></tr>}
+                    {fd.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-muted text-sm">{t('Nieko nerasta')}</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -1522,7 +1534,7 @@ export default function App() {
                   <div key={title} className="bg-canvas/40 rounded-2xl border border-hairline p-3">
                     <div className="flex items-center gap-2 px-2 py-1.5 mb-2">
                       <span className={cn('w-2 h-2 rounded-full', dot)} />
-                      <p className="text-sm font-semibold">{title}</p>
+                      <p className="text-sm font-semibold">{t(title)}</p>
                       <span className="text-xs text-muted">· {list.length}</span>
                     </div>
                     <div className="space-y-2">
@@ -1573,9 +1585,9 @@ export default function App() {
                     <p className="font-mono font-bold text-base tracking-tight">{car.number}</p>
                     {(car.brand || car.year) && <p className="text-[11px] text-muted truncate">{[car.brand, car.year].filter(Boolean).join(' · ')}</p>}
                     <div className="flex gap-1.5 mt-1 flex-wrap">
-                      <Badge variant="blue">{car.type}</Badge>
+                      <Badge variant="blue">{t(car.type)}</Badge>
                       <Badge>{car.registration}</Badge>
-                      <Badge variant={car.status === 'Aktyvus' ? 'green' : 'red'}>{car.status}</Badge>
+                      <Badge variant={car.status === 'Aktyvus' ? 'green' : 'red'}>{t(car.status)}</Badge>
                     </div>
                   </div>
                   <input type="checkbox" onClick={e => e.stopPropagation()} checked={sel} onChange={() => toggleSel(car.id)} className="accent-gold mt-0.5 w-4 h-4" />
@@ -1584,16 +1596,16 @@ export default function App() {
                 <div className="flex items-center gap-2 text-sm border-t border-hairline mt-3 pt-3">
                   {driver ? <>
                     <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-semibold shrink-0">{driver.name.split(' ').map(w => w[0]).slice(0, 2).join('')}</div>
-                    <div className="min-w-0"><p className="font-semibold text-xs truncate">{driver.name}</p><p className="text-[10px] text-muted">Grįžta {driver.plannedReturnDate || '?'}</p></div>
+                    <div className="min-w-0"><p className="font-semibold text-xs truncate">{driver.name}</p><p className="text-[10px] text-muted">{t('Grįžta')} {driver.plannedReturnDate || '?'}</p></div>
                   </> : <>
                     <div className="w-7 h-7 rounded-full bg-stone-100 flex items-center justify-center shrink-0"><User size={13} className="text-stone-400" /></div>
-                    <p className="text-stone-400 italic text-xs">Laisva</p>
+                    <p className="text-stone-400 italic text-xs">{t('Laisva')}</p>
                   </>}
-                  {plan && <span className="ml-auto text-[9px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full shrink-0">PLANAS {format(parseISO(plan.date), 'MM.dd')}</span>}
+                  {plan && <span className="ml-auto text-[9px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full shrink-0">{t('PLANAS')} {format(parseISO(plan.date), 'MM.dd')}</span>}
                 </div>
 
                 {!driver && (
-                  <button onClick={e => { e.stopPropagation(); setSelectedCarForAssignment(car.number); setTripOpen(true); }} className="w-full bg-ink text-white py-2 rounded-xl text-xs font-bold hover:bg-ink/85 transition-colors mt-3">Priskirti vairuotoją</button>
+                  <button onClick={e => { e.stopPropagation(); setSelectedCarForAssignment(car.number); setTripOpen(true); }} className="w-full bg-ink text-white py-2 rounded-xl text-xs font-bold hover:bg-ink/85 transition-colors mt-3">{t('Priskirti vairuotoją')}</button>
                 )}
               </div>
             );
@@ -1605,28 +1617,28 @@ export default function App() {
               <div className="flex bg-ink/[0.06] p-1 rounded-xl self-start">
                 {([['cards', 'Kortelės', LayoutGrid], ['kanban', 'Pagal tipą', Columns3], ['table', 'Lentelė', List]] as const).map(([v, label, Icon]) => (
                   <button key={v} onClick={() => setCarView(v)} className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all', carView === v ? 'bg-surface shadow-card text-ink' : 'text-muted hover:text-ink')}>
-                    <Icon size={14} /> {label}
+                    <Icon size={14} /> {t(label)}
                   </button>
                 ))}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {selectedCarIds.length > 0 && (
                   <div className="flex items-center gap-1.5 mr-1">
-                    <span className="text-xs font-semibold text-ink bg-gold/15 px-2.5 py-1.5 rounded-lg">{selectedList.length} pasirinkta</span>
-                    <button onClick={() => emailCars(selectedList)} title="Siųsti el. paštu" className="p-2 rounded-lg bg-ink/[0.06] hover:bg-ink hover:text-white transition-all"><Mail size={14} /></button>
-                    <button onClick={() => exportCarsCSV(selectedList)} title="Eksportuoti CSV" className="p-2 rounded-lg bg-ink/[0.06] hover:bg-ink hover:text-white transition-all"><Download size={14} /></button>
-                    <button onClick={() => setSelectedCarIds([])} title="Išvalyti" className="p-2 rounded-lg text-muted hover:text-red-500 transition-colors"><X size={14} /></button>
+                    <span className="text-xs font-semibold text-ink bg-gold/15 px-2.5 py-1.5 rounded-lg">{selectedList.length} {t('pasirinkta')}</span>
+                    <button onClick={() => emailCars(selectedList)} title={t('Siųsti el. paštu')} className="p-2 rounded-lg bg-ink/[0.06] hover:bg-ink hover:text-white transition-all"><Mail size={14} /></button>
+                    <button onClick={() => exportCarsCSV(selectedList)} title={t('Eksportuoti CSV')} className="p-2 rounded-lg bg-ink/[0.06] hover:bg-ink hover:text-white transition-all"><Download size={14} /></button>
+                    <button onClick={() => setSelectedCarIds([])} title={t('Išvalyti')} className="p-2 rounded-lg text-muted hover:text-red-500 transition-colors"><X size={14} /></button>
                   </div>
                 )}
                 <select className={cn(selectCls, 'w-auto')} value={carFilter.registration} onChange={e => setCarFilter(p => ({ ...p, registration: e.target.value as RegistrationType | '' }))}>
-                  <option value="">Visos registracijos</option><option value="LT">LT</option><option value="PL">PL</option>
+                  <option value="">{t('Visos registracijos')}</option><option value="LT">LT</option><option value="PL">PL</option>
                 </select>
                 <select className={cn(selectCls, 'w-auto')} value={carFilter.type} onChange={e => setCarFilter(p => ({ ...p, type: e.target.value as CarType | '' }))}>
-                  <option value="">Visi tipai</option><option value="Tentas">Tentas</option><option value="Refas">Refas</option>
+                  <option value="">{t('Visi tipai')}</option><option value="Tentas">{t('Tentas')}</option><option value="Refas">{t('Refas')}</option>
                 </select>
-                <input placeholder="Paieška..." className={cn(inputCls, 'w-32')} value={carFilter.search} onChange={e => setCarFilter(p => ({ ...p, search: e.target.value }))} />
-                <button onClick={() => exportCarsCSV(fc)} title="Eksportuoti visus į CSV" className="p-2 rounded-lg border border-hairline text-muted hover:text-ink hover:border-ink/30 transition-all"><Download size={15} /></button>
-                <button onClick={() => { setCarImportRows([]); setCarImportMeta(null); setCarImportErr(null); setCarImportOpen(true); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ink text-white text-xs font-semibold hover:bg-ink/85 transition-all"><Upload size={14} /> Importuoti Excel</button>
+                <input placeholder={t('Paieška...')} className={cn(inputCls, 'w-32')} value={carFilter.search} onChange={e => setCarFilter(p => ({ ...p, search: e.target.value }))} />
+                <button onClick={() => exportCarsCSV(fc)} title={t('Eksportuoti visus į CSV')} className="p-2 rounded-lg border border-hairline text-muted hover:text-ink hover:border-ink/30 transition-all"><Download size={15} /></button>
+                <button onClick={() => { setCarImportRows([]); setCarImportMeta(null); setCarImportErr(null); setCarImportOpen(true); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ink text-white text-xs font-semibold hover:bg-ink/85 transition-all"><Upload size={14} /> {t('Importuoti Excel')}</button>
               </div>
             </div>
 
@@ -1634,7 +1646,7 @@ export default function App() {
             {carView === 'cards' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {fc.map(carCard)}
-                {fc.length === 0 && <div className="col-span-full text-center text-muted py-10 text-sm">Nieko nerasta</div>}
+                {fc.length === 0 && <div className="col-span-full text-center text-muted py-10 text-sm">{t('Nieko nerasta')}</div>}
               </div>
             )}
 
@@ -1645,7 +1657,7 @@ export default function App() {
                   <div key={title} className="bg-canvas/40 rounded-2xl border border-hairline p-3">
                     <div className="flex items-center gap-2 px-2 py-1.5 mb-2">
                       <span className={cn('w-2 h-2 rounded-full', dot)} />
-                      <p className="text-sm font-semibold">{title}</p>
+                      <p className="text-sm font-semibold">{t(title)}</p>
                       <span className="text-xs text-muted">· {list.length}</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1664,12 +1676,12 @@ export default function App() {
                   <thead>
                     <tr className="bg-ink text-white text-left">
                       <th className="pl-4 pr-2 py-3 w-9"><input type="checkbox" checked={allSel} onChange={() => setSelectedCarIds(allSel ? [] : fc.map(c => c.id))} className="accent-gold w-4 h-4 align-middle" /></th>
-                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Mašina</th>
-                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Reg.</th>
-                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Būsena</th>
-                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Vairuotojas</th>
-                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">Keitimas</th>
-                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold text-right">Veiksmai</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">{t('Mašina')}</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">{t('Reg.')}</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">{t('Būsena')}</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">{t('Vairuotojas')}</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold">{t('Keitimas')}</th>
+                      <th className="px-4 py-3 text-[10px] uppercase tracking-wider font-bold text-right">{t('Veiksmai')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
@@ -1687,12 +1699,12 @@ export default function App() {
                             </div>
                           </td>
                           <td className="px-4 py-3"><Badge>{car.registration}</Badge></td>
-                          <td className="px-4 py-3"><Badge variant={car.status === 'Aktyvus' ? 'green' : 'red'}>{car.status}</Badge></td>
-                          <td className="px-4 py-3 text-xs">{driver ? <span className="font-semibold">{driver.name}</span> : <span className="text-muted italic">Laisva</span>}</td>
+                          <td className="px-4 py-3"><Badge variant={car.status === 'Aktyvus' ? 'green' : 'red'}>{t(car.status)}</Badge></td>
+                          <td className="px-4 py-3 text-xs">{driver ? <span className="font-semibold">{driver.name}</span> : <span className="text-muted italic">{t('Laisva')}</span>}</td>
                           <td className="px-4 py-3 text-xs">{plan ? <span className="text-violet-600 font-semibold">{plan.incomingDriverName} · {format(parseISO(plan.date), 'MM.dd')}</span> : <span className="text-muted">—</span>}</td>
                           <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                             <div className="flex justify-end gap-1.5">
-                              {!driver && <button onClick={() => { setSelectedCarForAssignment(car.number); setTripOpen(true); }} className="px-2.5 py-1 bg-ink text-white text-[10px] font-bold rounded-lg hover:bg-ink/85 transition-colors">Priskirti</button>}
+                              {!driver && <button onClick={() => { setSelectedCarForAssignment(car.number); setTripOpen(true); }} className="px-2.5 py-1 bg-ink text-white text-[10px] font-bold rounded-lg hover:bg-ink/85 transition-colors">{t('Priskirti')}</button>}
                               <button onClick={() => { setSelectedCarForEdit(car); setEditCarOpen(true); }} className="p-1.5 bg-ink/[0.05] text-ink hover:bg-ink hover:text-white rounded-lg transition-all"><Edit size={13} /></button>
                               <button onClick={() => deleteCar(car.id)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Trash2 size={13} /></button>
                             </div>
@@ -1700,7 +1712,7 @@ export default function App() {
                         </tr>
                       );
                     })}
-                    {fc.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-muted text-sm">Nieko nerasta</td></tr>}
+                    {fc.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-muted text-sm">{t('Nieko nerasta')}</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -2186,7 +2198,7 @@ export default function App() {
             <div className="px-6 py-4 bg-ink text-white">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-display text-lg font-medium capitalize">{format(sel, 'EEEE, MMMM d', { locale: lt })}</p>
+                  <p className="font-display text-lg font-medium capitalize">{format(sel, 'EEEE, MMMM d', { locale: dfLocale })}</p>
                   <p className="text-[10px] text-gold-soft uppercase tracking-[0.18em] mt-0.5">Savaitė {format(wStart, 'MM.dd')}–{format(wEnd, 'MM.dd')} · {weekPlans.length} keitimai</p>
                 </div>
                 <button onClick={() => setSelectedCalendarDay(null)} className="p-1.5 hover:bg-white/10 rounded-lg"><X size={16}/></button>
@@ -2198,7 +2210,7 @@ export default function App() {
                   const isSel = ds === selectedCalendarDay;
                   return (
                     <button key={ds} onClick={() => setSelectedCalendarDay(ds)} className={cn("rounded-lg py-1.5 text-center transition-all", isSel ? "bg-gold text-ink" : "bg-white/5 hover:bg-white/10")}>
-                      <div className="text-[8px] uppercase opacity-70">{format(d, 'EEEEEE', { locale: lt })}</div>
+                      <div className="text-[8px] uppercase opacity-70">{format(d, 'EEEEEE', { locale: dfLocale })}</div>
                       <div className="text-sm font-semibold leading-tight">{format(d, 'd')}</div>
                       <div className={cn("text-[8px] font-bold leading-none", cnt > 0 ? (isSel ? "text-ink/70" : "text-gold-soft") : "opacity-0")}>{cnt || '·'}</div>
                     </button>
@@ -2447,10 +2459,11 @@ function SectionHeader({ icon, title, children }: { icon: React.ReactNode; title
 }
 
 function MonthNav({ value, onChange }: { value: Date; onChange: (d: Date) => void }) {
+  const dfLocale = useDateLocale();
   return (
     <div className="flex items-center gap-1 bg-surface border border-hairline rounded-full p-1">
       <button onClick={() => onChange(subMonths(value, 1))} className="p-1.5 text-muted hover:text-ink hover:bg-stone-100 rounded-full transition-colors"><ChevronLeft size={14}/></button>
-      <span className="px-3 text-xs font-medium min-w-[110px] text-center capitalize">{format(value, 'MMMM yyyy', { locale: lt })}</span>
+      <span className="px-3 text-xs font-medium min-w-[110px] text-center capitalize">{format(value, 'MMMM yyyy', { locale: dfLocale })}</span>
       <button onClick={() => onChange(addMonths(value, 1))} className="p-1.5 text-muted hover:text-ink hover:bg-stone-100 rounded-full transition-colors"><ChevronRight size={14}/></button>
     </div>
   );
@@ -2792,6 +2805,8 @@ function PlanCard({ plan, drivers, cars, plans, onComplete, onDelete, onEdit, ed
   editingPlanId: string | null; setEditingPlanId: (id: string | null) => void;
   setPlans: React.Dispatch<React.SetStateAction<ReplacementPlan[]>>;
 }) {
+  const dfLocale = useDateLocale();
+  const t = useT();
   const car = cars.find(c => c.number === plan.carNumber);
   const leaving = drivers.find(d => d.id === plan.leavingDriverId);
   const incoming = drivers.find(d => d.id === plan.incomingDriverId);
@@ -2805,7 +2820,7 @@ function PlanCard({ plan, drivers, cars, plans, onComplete, onDelete, onEdit, ed
         <div className="flex flex-row sm:flex-col items-center gap-2 sm:gap-1.5 sm:min-w-[64px]">
           <div className="w-12 h-12 rounded-2xl bg-ink text-white flex flex-col items-center justify-center shadow-card">
             <span className="text-lg font-display font-semibold leading-none">{format(parseISO(plan.date), 'dd')}</span>
-            <span className="text-[8px] uppercase tracking-wide text-gold-soft">{format(parseISO(plan.date), 'EEE', { locale: lt })}</span>
+            <span className="text-[8px] uppercase tracking-wide text-gold-soft">{format(parseISO(plan.date), 'EEE', { locale: dfLocale })}</span>
           </div>
           <div className="flex flex-col items-center gap-0.5">
             <span className="font-mono text-[10px] font-bold text-ink bg-ink/[0.06] px-2 py-0.5 rounded">{plan.carNumber}</span>
@@ -2894,6 +2909,7 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
   onMovePlanDate?: (planId: string, deltaDays: number) => void;
   onMovePlanToCar?: (planId: string, newCar: string) => void;
 }) {
+  const dfLocale = useDateLocale();
   const monthStart = startOfMonth(month);
   const monthEnd   = endOfMonth(month);
   const totalDays  = getDaysInMonth(month);
@@ -2999,7 +3015,7 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
                 const weekend = [0, 6].includes(d.getDay());
                 return (
                   <div key={d.toString()} className={cn("flex-1 py-2 text-center border-r border-white/5", today && "bg-gold/30", weekend && !today && "bg-white/5")}>
-                    <div className="text-[7px] uppercase opacity-50">{format(d, 'EEE', { locale: lt })}</div>
+                    <div className="text-[7px] uppercase opacity-50">{format(d, 'EEE', { locale: dfLocale })}</div>
                     <div className="text-[9px] font-semibold">{format(d, 'd')}</div>
                   </div>
                 );
