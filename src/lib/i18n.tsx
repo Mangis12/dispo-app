@@ -292,6 +292,7 @@ const RU: Record<string, string> = {
   'Slėpti': 'Скрыть',
   'Nereikalingų vairuotojų nėra': 'Ненужных водителей нет',
   'Šie vairuotojai nesiūlomi automatiškai, bet juos galima įtraukti rankiniu būdu.': 'Эти водители не предлагаются автоматически, но их можно добавить вручную.',
+  'Ieškoti pagal pavardę...': 'Поиск по фамилии...',
   'Galima dabar': 'Доступны сейчас',
   'Greitai (≤7 d.)': 'Скоро (≤7 дн.)',
   'Vėliau': 'Позже',

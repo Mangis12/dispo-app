@@ -265,7 +265,8 @@ export default function App() {
   const [selectedDriverForDismiss, setSelectedDriverForDismiss] = useState<Driver | null>(null);
   const [showDismissed, setShowDismissed]                   = useState(false);
   const [showUnneeded, setShowUnneeded]                     = useState(false);
-  const [showLaterHome, setShowLaterHome]                   = useState(false);
+  const [homeSearch, setHomeSearch]                         = useState('');
+  const [homeExpanded, setHomeExpanded]                     = useState<Record<string, boolean>>({});
   const [selectedCarForEdit, setSelectedCarForEdit]         = useState<Car | null>(null);
   const [editAssignment, setEditAssignment]                 = useState<CarAssignment | null>(null);
   const [planGroup, setPlanGroup]                           = useState<'all' | CarType>('all');
@@ -1271,18 +1272,30 @@ export default function App() {
               })()}
             </section>
 
-            {/* Drivers at Home — grupuota pagal pasiruošimą */}
+            {/* Drivers at Home — paieška + grupavimas pagal pasiruošimą */}
             <section>
-              <SectionHeader icon={<Home size={18} className="text-emerald-500"/>} title={t('Vairuotojai namuose')} />
+              <SectionHeader icon={<Home size={18} className="text-emerald-500"/>} title={t('Vairuotojai namuose')}>
+                <div className="relative">
+                  <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                  <input value={homeSearch} onChange={e => setHomeSearch(e.target.value)} placeholder={t('Ieškoti pagal pavardę...')}
+                    className="w-44 sm:w-56 bg-surface border border-hairline rounded-full pl-8 pr-7 py-1.5 text-xs focus:outline-none focus:border-ink/40 transition-all" />
+                  {homeSearch && <button onClick={() => setHomeSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-ink"><X size={13} /></button>}
+                </div>
+              </SectionHeader>
               {namuoseDrivers.length === 0
                 ? <EmptyState icon={<Users size={28}/>} text={t('Visi vairuotojai reise')} />
                 : (() => {
                   const today = new Date();
+                  const CAP = 18; // kiek rodyti viename bloke prieš „Rodyti visus"
+                  const q = homeSearch.trim().toLowerCase();
+                  const surname = (n: string) => { const p = n.trim().split(/\s+/); return (p[p.length - 1] || n).toLowerCase(); };
+                  const bySurname = (a: Driver, b: Driver) => surname(a.name).localeCompare(surname(b.name), 'lt');
+                  const matches = q ? namuoseDrivers.filter(d => d.name.toLowerCase().includes(q)) : namuoseDrivers;
                   const readyNow = (d: Driver) => !d.readinessDate || !isAfter(parseISO(d.readinessDate), today);
                   const soon = (d: Driver) => !!d.readinessDate && isAfter(parseISO(d.readinessDate), today) && differenceInDays(parseISO(d.readinessDate), today) <= 7;
-                  const bucketNow   = namuoseDrivers.filter(readyNow);
-                  const bucketSoon  = namuoseDrivers.filter(soon);
-                  const bucketLater = namuoseDrivers.filter(d => !readyNow(d) && !soon(d));
+                  const bucketNow   = matches.filter(readyNow).sort(bySurname);
+                  const bucketSoon  = matches.filter(soon).sort(bySurname);
+                  const bucketLater = matches.filter(d => !readyNow(d) && !soon(d)).sort(bySurname);
                   const grid = (list: Driver[]) => (
                     <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-2">
                       {list.map(d => (
@@ -1290,29 +1303,35 @@ export default function App() {
                       ))}
                     </div>
                   );
-                  const groupHead = (dot: string, label: string, n: number) => (
-                    <div className="flex items-center gap-2 mb-2 mt-1">
-                      <span className={cn('w-2 h-2 rounded-full', dot)} />
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted">{label}</p>
-                      <span className="text-[11px] font-semibold text-stone-400">· {n}</span>
-                    </div>
-                  );
+                  // Blokas su antrašte ir „Rodyti visus" (jei daugiau nei CAP). Paieškoje — viskas išplėsta.
+                  const bucket = (key: string, dot: string, label: string, list: Driver[]) => {
+                    if (list.length === 0) return null;
+                    const expanded = !!homeExpanded[key] || !!q;
+                    const shown = expanded ? list : list.slice(0, CAP);
+                    const toggle = () => setHomeExpanded(p => ({ ...p, [key]: !p[key] }));
+                    return (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 mt-1">
+                          <span className={cn('w-2 h-2 rounded-full', dot)} />
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-muted">{label}</p>
+                          <span className="text-[11px] font-semibold text-stone-400">· {list.length}</span>
+                        </div>
+                        {grid(shown)}
+                        {!q && list.length > CAP && (
+                          <button onClick={toggle} className="mt-2 w-full flex items-center justify-center gap-1.5 text-[11px] font-semibold text-muted hover:text-ink py-1.5 rounded-lg hover:bg-ink/[0.04] transition-all">
+                            {expanded ? t('Slėpti') : `${t('Rodyti visus')} (${list.length})`}
+                            <ChevronDown size={14} className={cn('transition-transform', expanded && 'rotate-180')} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  };
+                  if (matches.length === 0) return <p className="text-sm text-muted text-center py-8">{t('Nieko nerasta')}</p>;
                   return (
                     <div className="space-y-4">
-                      {bucketNow.length > 0 && <div>{groupHead('bg-emerald-400', t('Galima dabar'), bucketNow.length)}{grid(bucketNow)}</div>}
-                      {bucketSoon.length > 0 && <div>{groupHead('bg-amber-400', t('Greitai (≤7 d.)'), bucketSoon.length)}{grid(bucketSoon)}</div>}
-                      {bucketLater.length > 0 && (
-                        <div>
-                          <button onClick={() => setShowLaterHome(v => !v)} className="w-full flex items-center gap-2 mb-2 mt-1 group">
-                            <span className="w-2 h-2 rounded-full bg-stone-300" />
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-muted">{t('Vėliau')}</p>
-                            <span className="text-[11px] font-semibold text-stone-400">· {bucketLater.length}</span>
-                            <span className="ml-auto text-[11px] text-muted group-hover:text-ink transition-colors">{showLaterHome ? t('Slėpti') : t('Rodyti visus')}</span>
-                            <ChevronDown size={15} className={cn('text-muted transition-transform', showLaterHome && 'rotate-180')} />
-                          </button>
-                          {showLaterHome && grid(bucketLater)}
-                        </div>
-                      )}
+                      {bucket('now',  'bg-emerald-400', t('Galima dabar'), bucketNow)}
+                      {bucket('soon', 'bg-amber-400',   t('Greitai (≤7 d.)'), bucketSoon)}
+                      {bucket('later','bg-stone-300',   t('Vėliau'), bucketLater)}
                     </div>
                   );
                 })()
