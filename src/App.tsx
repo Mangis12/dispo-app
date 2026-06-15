@@ -265,6 +265,7 @@ export default function App() {
   const [selectedDriverForDismiss, setSelectedDriverForDismiss] = useState<Driver | null>(null);
   const [showDismissed, setShowDismissed]                   = useState(false);
   const [showUnneeded, setShowUnneeded]                     = useState(false);
+  const [showLaterHome, setShowLaterHome]                   = useState(false);
   const [selectedCarForEdit, setSelectedCarForEdit]         = useState<Car | null>(null);
   const [editAssignment, setEditAssignment]                 = useState<CarAssignment | null>(null);
   const [planGroup, setPlanGroup]                           = useState<'all' | CarType>('all');
@@ -1270,18 +1271,51 @@ export default function App() {
               })()}
             </section>
 
-            {/* Drivers at Home */}
+            {/* Drivers at Home — grupuota pagal pasiruošimą */}
             <section>
               <SectionHeader icon={<Home size={18} className="text-emerald-500"/>} title={t('Vairuotojai namuose')} />
               {namuoseDrivers.length === 0
                 ? <EmptyState icon={<Users size={28}/>} text={t('Visi vairuotojai reise')} />
-                : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-2">
-                    {namuoseDrivers.map(d => (
-                      <HomeDriverCard key={d.id} driver={d} canEdit={canEdit} onSendToTrip={() => { setSelectedDriverForTrip(d); setTripOpen(true); }} />
-                    ))}
-                  </div>
-                )
+                : (() => {
+                  const today = new Date();
+                  const readyNow = (d: Driver) => !d.readinessDate || !isAfter(parseISO(d.readinessDate), today);
+                  const soon = (d: Driver) => !!d.readinessDate && isAfter(parseISO(d.readinessDate), today) && differenceInDays(parseISO(d.readinessDate), today) <= 7;
+                  const bucketNow   = namuoseDrivers.filter(readyNow);
+                  const bucketSoon  = namuoseDrivers.filter(soon);
+                  const bucketLater = namuoseDrivers.filter(d => !readyNow(d) && !soon(d));
+                  const grid = (list: Driver[]) => (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-2">
+                      {list.map(d => (
+                        <HomeDriverCard key={d.id} driver={d} canEdit={canEdit} onSendToTrip={() => { setSelectedDriverForTrip(d); setTripOpen(true); }} />
+                      ))}
+                    </div>
+                  );
+                  const groupHead = (dot: string, label: string, n: number) => (
+                    <div className="flex items-center gap-2 mb-2 mt-1">
+                      <span className={cn('w-2 h-2 rounded-full', dot)} />
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted">{label}</p>
+                      <span className="text-[11px] font-semibold text-stone-400">· {n}</span>
+                    </div>
+                  );
+                  return (
+                    <div className="space-y-4">
+                      {bucketNow.length > 0 && <div>{groupHead('bg-emerald-400', t('Galima dabar'), bucketNow.length)}{grid(bucketNow)}</div>}
+                      {bucketSoon.length > 0 && <div>{groupHead('bg-amber-400', t('Greitai (≤7 d.)'), bucketSoon.length)}{grid(bucketSoon)}</div>}
+                      {bucketLater.length > 0 && (
+                        <div>
+                          <button onClick={() => setShowLaterHome(v => !v)} className="w-full flex items-center gap-2 mb-2 mt-1 group">
+                            <span className="w-2 h-2 rounded-full bg-stone-300" />
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-muted">{t('Vėliau')}</p>
+                            <span className="text-[11px] font-semibold text-stone-400">· {bucketLater.length}</span>
+                            <span className="ml-auto text-[11px] text-muted group-hover:text-ink transition-colors">{showLaterHome ? t('Slėpti') : t('Rodyti visus')}</span>
+                            <ChevronDown size={15} className={cn('text-muted transition-transform', showLaterHome && 'rotate-180')} />
+                          </button>
+                          {showLaterHome && grid(bucketLater)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               }
             </section>
 
