@@ -291,6 +291,9 @@ export default function App() {
   const [drafts, setDrafts] = useState<{ carNumber: string; incomingDriverId: string; date: string }[]>([]);
   // Rolių administravimo langas (tik pilnų teisių vartotojui)
   const [roleAdminOpen, setRoleAdminOpen] = useState(false);
+  // Bendras patvirtinimo langas (taip/ne prieš įvykdant veiksmą)
+  const [confirmAsk, setConfirmAsk] = useState<{ title: string; message: React.ReactNode; confirmLabel?: string; danger?: boolean; onConfirm: () => void } | null>(null);
+  const askConfirm = (opts: { title: string; message: React.ReactNode; confirmLabel?: string; danger?: boolean; onConfirm: () => void }) => setConfirmAsk(opts);
   const [dragOverZone, setDragOverZone] = useState<string | null>(null); // carNumber arba 'pool'
   // Automobilių „duomenų bazė"
   const [carView, setCarView]                 = useState<'table' | 'kanban' | 'cards'>('cards');
@@ -1198,7 +1201,7 @@ export default function App() {
                                 setConfirmData({ carNumber: plan.carNumber, leavingId: plan.leavingDriverId, incomingId: plan.incomingDriverId, date: plan.date, driverName: plan.incomingDriverName, planId: plan.id, isExecution: true });
                                 if (plan.newPlannedReturnDate) setNewReturnDate(plan.newPlannedReturnDate);
                               }}
-                              onDelete={() => deletePlan(plan.id)}
+                              onDelete={() => askConfirm({ title: t('Atšaukti planą?'), danger: true, confirmLabel: t('Taip, atšaukti'), message: <span>{plan.carNumber}: {plan.incomingDriverName} ({format(parseISO(plan.date), 'yyyy-MM-dd')})</span>, onConfirm: () => deletePlan(plan.id) })}
                               onEdit={() => setEditingPlanId(plan.id)}
                               editingPlanId={editingPlanId}
                               setEditingPlanId={setEditingPlanId}
@@ -1438,12 +1441,12 @@ export default function App() {
                   ) : (
                     <div className="space-y-2">
                       {shown.map(plan => {
-                        const t = typeOf(plan);
+                        const carType = typeOf(plan);
                         return (
                           <div key={plan.id} className="flex items-center justify-between p-3 bg-canvas rounded-xl border border-hairline">
                             <div className="flex items-center gap-3 min-w-0">
                               <span className="font-mono text-xs font-semibold bg-ink text-white px-2 py-0.5 rounded shrink-0">{plan.carNumber}</span>
-                              {t && <Badge variant={t === 'Tentas' ? 'blue' : 'purple'}>{t}</Badge>}
+                              {carType && <Badge variant={carType === 'Tentas' ? 'blue' : 'purple'}>{t(carType)}</Badge>}
                               <div className="min-w-0">
                                 <p className="text-xs font-semibold truncate">{plan.leavingDriverName} → {plan.incomingDriverName}</p>
                                 <p className="text-[10px] text-muted">{plan.date}{plan.newPlannedReturnDate ? ` • dirbs iki: ${plan.newPlannedReturnDate}` : ''}</p>
@@ -1451,7 +1454,7 @@ export default function App() {
                             </div>
                             <div className="flex gap-1.5 shrink-0">
                               <button title="Įvykdyti" onClick={() => { setConfirmData({ carNumber: plan.carNumber, leavingId: plan.leavingDriverId, incomingId: plan.incomingDriverId, date: plan.date, driverName: plan.incomingDriverName, planId: plan.id, isExecution: true }); if (plan.newPlannedReturnDate) setNewReturnDate(plan.newPlannedReturnDate); }} className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-all"><CheckCircle2 size={14}/></button>
-                              <button title="Ištrinti" onClick={() => deletePlan(plan.id)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Trash2 size={14}/></button>
+                              <button title="Ištrinti" onClick={() => askConfirm({ title: t('Atšaukti planą?'), danger: true, confirmLabel: t('Taip, atšaukti'), message: <span>{plan.carNumber}: {plan.incomingDriverName} ({format(parseISO(plan.date), 'yyyy-MM-dd')})</span>, onConfirm: () => deletePlan(plan.id) })} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Trash2 size={14}/></button>
                             </div>
                           </div>
                         );
@@ -1990,6 +1993,20 @@ export default function App() {
           const draftFor = (carNumber: string) => drafts.find(d => d.carNumber === carNumber);
           const driverById = (id: string) => drivers.find(d => d.id === id);
           const inits = (name: string) => name.split(' ').map(w => w[0]).slice(0, 2).join('');
+          // Optimalaus vairuotojo rekomendacija mašinai: +specializacija (tipas), +įmonė (LT/PL),
+          // greitesnis pasiruošimas. Universalus tinka bet kuriam tipui.
+          const matchScore = (d: Driver, c: Car) => {
+            let s = 0;
+            if (d.specialization === c.type) s += 3;
+            else if (d.specialization === 'Universalus') s += 1;
+            else s -= 3;
+            if (d.companyType === c.registration) s += 2;
+            return s;
+          };
+          const recommendFor = (c: Car) => pool
+            .map(d => ({ d, s: matchScore(d, c) }))
+            .filter(x => x.s > 0)
+            .sort((a, b) => b.s - a.s || (a.d.readinessDate || '9').localeCompare(b.d.readinessDate || '9'))[0]?.d;
           const onDropToCar = (carNumber: string, e: React.DragEvent) => {
             e.preventDefault(); setDragOverZone(null);
             const id = e.dataTransfer.getData('driverId');
@@ -2070,6 +2087,7 @@ export default function App() {
                             <p className="font-mono font-bold text-sm leading-tight">{car.number}</p>
                             <p className="text-[10px] text-muted">{[t(car.type), car.brand].filter(Boolean).join(' · ')}</p>
                           </div>
+                          {ready && incoming && matchScore(incoming, car) >= 3 && <span className="inline-flex items-center gap-1 text-[9px] font-bold text-gold bg-gold/10 px-1.5 py-0.5 rounded-full"><Check size={10} />{t('Optimalu')}</span>}
                           {ready && <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600"><CheckCircle2 size={12} />{t('Keitimas paruoštas')}</span>}
                         </div>
 
@@ -2084,7 +2102,20 @@ export default function App() {
                           <span className="uppercase tracking-wide text-[9px] font-bold text-stone-400 w-12 shrink-0">{t('Naujas')}</span>
                           {incoming
                             ? <div className="flex-1 flex items-center gap-1">{driverChip(incoming, car.number)}<button onClick={() => removeDraft(car.number)} className="p-1.5 text-muted hover:text-red-500 transition-colors shrink-0"><X size={13} /></button></div>
-                            : <div className="flex-1 border-2 border-dashed border-hairline rounded-xl px-3 py-2.5 text-center text-[11px] text-stone-400">{t('Vilkite čia vairuotoją')}</div>}
+                            : (() => {
+                                const rec = recommendFor(car);
+                                if (!rec) return <div className="flex-1 border-2 border-dashed border-hairline rounded-xl px-3 py-2.5 text-center text-[11px] text-stone-400">{t('Vilkite čia vairuotoją')}</div>;
+                                return (
+                                  <button onClick={() => assignDraft(car.number, rec.id)} className="flex-1 flex items-center gap-2 border-2 border-dashed border-gold/50 bg-gold/[0.04] hover:bg-gold/10 rounded-xl px-2.5 py-2 text-left transition-all">
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold text-gold bg-gold/15 px-1.5 py-0.5 rounded-full shrink-0">✨ {t('Siūloma')}</span>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-[12px] font-semibold truncate leading-tight">{rec.name}</p>
+                                      <p className="text-[10px] text-muted truncate">{rec.companyType} · {t(rec.specialization)}</p>
+                                    </div>
+                                    <Plus size={14} className="text-gold shrink-0" />
+                                  </button>
+                                );
+                              })()}
                         </div>
 
                         {dr && (
@@ -2134,7 +2165,27 @@ export default function App() {
                   </div>
                 )}
               <button
-                onClick={confirmDrafts}
+                onClick={() => askConfirm({
+                  title: t('Patvirtinti keitimus?'),
+                  confirmLabel: t('Taip, suplanuoti'),
+                  message: (
+                    <div className="space-y-1.5">
+                      <p>{t('Šie keitimai bus suplanuoti ir perduoti tolesniems žingsniams:')}</p>
+                      <ul className="mt-2 space-y-1">
+                        {drafts.map(dr => {
+                          const inc = driverById(dr.incomingDriverId);
+                          const lv = drivers.find(x => x.currentCar === dr.carNumber && x.status === 'Reise');
+                          return <li key={dr.carNumber} className="flex items-center gap-2 text-xs bg-canvas border border-hairline rounded-lg px-2.5 py-1.5">
+                            <span className="font-mono font-semibold">{dr.carNumber}</span>
+                            <span className="text-muted truncate">{lv ? lv.name : '—'} → <span className="text-emerald-600 font-semibold">{inc?.name}</span></span>
+                            <span className="ml-auto font-mono text-muted shrink-0">{dr.date}</span>
+                          </li>;
+                        })}
+                      </ul>
+                    </div>
+                  ),
+                  onConfirm: confirmDrafts,
+                })}
                 disabled={drafts.length === 0}
                 className="w-full mt-4 inline-flex items-center justify-center gap-2 bg-ink text-white py-3 rounded-xl text-sm font-bold hover:bg-ink/85 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -2362,6 +2413,21 @@ export default function App() {
             )}
           </div>
         </div>
+      )}
+
+      {/* ── Bendras patvirtinimo langas (taip/ne) ── */}
+      {confirmAsk && (
+        <Modal title={confirmAsk.title} onClose={() => setConfirmAsk(null)}>
+          <div className="space-y-4">
+            <div className="text-sm text-ink">{confirmAsk.message}</div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmAsk(null)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-muted hover:text-ink hover:bg-stone-100 transition-colors">{t('Atšaukti')}</button>
+              <button onClick={() => { const fn = confirmAsk.onConfirm; setConfirmAsk(null); fn(); }} className={cn("inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all", confirmAsk.danger ? "bg-red-600 hover:bg-red-700" : "bg-ink hover:bg-ink/85")}>
+                <Check size={15}/> {confirmAsk.confirmLabel || t('Patvirtinti')}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* ── Rolių valdymas (tik pilnų teisių vartotojui) ── */}
@@ -3287,13 +3353,27 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
   };
 
   // ── Paieška (Excel stiliaus: datalist + filtravimas pagal pavardę/numerį) ──
+  const t = useT();
   const [q, setQ] = useState('');
+  const [fType, setFType] = useState<CarType | ''>('');
+  const [fReg, setFReg] = useState<RegistrationType | ''>('');
   const ql = q.trim().toLowerCase();
   const allRows = showCars ? cars : drivers;
-  const rows = !ql ? allRows : allRows.filter(item => {
-    if (!showCars) return (item as Driver).name.toLowerCase().includes(ql);
-    const c = item as Car;
-    return c.number.toLowerCase().includes(ql) || carAssignments.some(a => a.carNumber === c.number && a.driverName.toLowerCase().includes(ql));
+  const rows = allRows.filter(item => {
+    // Tekstinė paieška
+    if (ql) {
+      if (!showCars) { if (!(item as Driver).name.toLowerCase().includes(ql)) return false; }
+      else {
+        const c = item as Car;
+        if (!(c.number.toLowerCase().includes(ql) || carAssignments.some(a => a.carNumber === c.number && a.driverName.toLowerCase().includes(ql)))) return false;
+      }
+    }
+    // Tipo / įmonės filtrai (Tentas/Refas, LT/PL)
+    const typeVal = showCars ? (item as Car).type : (item as Driver).specialization;
+    const regVal  = showCars ? (item as Car).registration : (item as Driver).companyType;
+    if (fType && typeVal !== fType) return false;
+    if (fReg && regVal !== fReg) return false;
+    return true;
   });
 
   return (
@@ -3314,6 +3394,22 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
         </datalist>
         {q && <button onClick={() => setQ('')} className="text-muted hover:text-ink transition-colors"><X size={15} /></button>}
         <span className="text-[11px] text-muted shrink-0 tabular-nums">{rows.length}/{allRows.length}</span>
+      </div>
+
+      {/* Filtrai: tipas (Tentas/Refas) + įmonė (LT/PL) */}
+      <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-hairline text-xs">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted mr-0.5">{t('Tipas / Įmonė')}</span>
+        <div className="flex bg-ink/[0.05] rounded-lg p-0.5">
+          {([['', t('Visi tipai')], ['Tentas', t('Tentas')], ['Refas', t('Refas')]] as const).map(([v, l]) => (
+            <button key={v} onClick={() => setFType(v as CarType | '')} className={cn('px-2.5 py-1 rounded-md font-medium transition-all', fType === v ? 'bg-surface shadow-card text-ink' : 'text-muted hover:text-ink')}>{l}</button>
+          ))}
+        </div>
+        <div className="flex bg-ink/[0.05] rounded-lg p-0.5">
+          {([['', t('Visos įmonės')], ['LT', 'LT'], ['PL', 'PL']] as const).map(([v, l]) => (
+            <button key={v} onClick={() => setFReg(v as RegistrationType | '')} className={cn('px-2.5 py-1 rounded-md font-medium transition-all', fReg === v ? 'bg-surface shadow-card text-ink' : 'text-muted hover:text-ink')}>{l}</button>
+          ))}
+        </div>
+        {(fType || fReg) && <button onClick={() => { setFType(''); setFReg(''); }} title={t('Išvalyti')} className="text-muted hover:text-red-500 transition-colors ml-0.5"><X size={14} /></button>}
       </div>
 
       <div className="overflow-x-auto">
