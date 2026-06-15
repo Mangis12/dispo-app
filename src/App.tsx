@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Database, Wifi, WifiOff, Bell, Map as MapIcon, MapPin, Menu, Search, Mail, Undo2, StickyNote,
   List, LayoutGrid, Columns3, Download, Phone, Snowflake, Container,
   Upload, FileSpreadsheet, ShieldCheck, ShieldAlert, Contact, CreditCard, FileCheck2,
-  ClipboardList, GripVertical, Check
+  ClipboardList, GripVertical, Check, Lock, UserCog
 } from 'lucide-react';
 import {
   format, differenceInDays, parseISO, isBefore, isAfter,
@@ -25,6 +25,7 @@ import { EmptyRoad, EmptyChecklist, SemiTruck, EuropeMap } from './components/il
 import { parseDriverWorkbook, mergeIntoDriver, buildDriverIndex, findExisting, buildDriverTemplate, type ParsedDriver } from './lib/importDrivers';
 import { parseCarWorkbook, mergeIntoCar, buildCarIndex, findExistingCar, buildCarTemplate, type ParsedCar } from './lib/importCars';
 import { useLang, useT, useDateLocale, type Lang } from './lib/i18n';
+import { useRole, ROLE_LABELS, type Role } from './lib/roles';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
   ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment, TaskPoint, CalendarNote
@@ -127,6 +128,16 @@ function Badge({ children, variant = 'default' }: { children: React.ReactNode; v
   );
 }
 
+// ─── Tik stebėjimo juosta (kai vartotojas neturi redagavimo teisių) ───────────
+function ReadOnlyNotice({ text }: { text: string }) {
+  return (
+    <div className="flex items-center gap-2 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5">
+      <Lock size={14} className="shrink-0" />
+      <span>{text}</span>
+    </div>
+  );
+}
+
 // ─── Modal Wrapper ────────────────────────────────────────────────────────────
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
@@ -212,6 +223,7 @@ export default function App() {
   const { lang, setLang } = useLang();
   const t = useT();
   const dfLocale = lang === 'ru' ? ru : lt;
+  const { role, canEdit, canCoordinate, isAdmin } = useRole();
   const [drivers, setDrivers]           = useState<Driver[]>([]);
   const [cars, setCars]                 = useState<Car[]>([]);
   const [history, setHistory]           = useState<HistoryEntry[]>([]);
@@ -277,6 +289,8 @@ export default function App() {
   const [carImportErr, setCarImportErr]       = useState<string | null>(null);
   // Keitimo juodraštis: laikinas keitimų rinkinys (carNumber → incoming vairuotojas)
   const [drafts, setDrafts] = useState<{ carNumber: string; incomingDriverId: string; date: string }[]>([]);
+  // Rolių administravimo langas (tik pilnų teisių vartotojui)
+  const [roleAdminOpen, setRoleAdminOpen] = useState(false);
   const [dragOverZone, setDragOverZone] = useState<string | null>(null); // carNumber arba 'pool'
   // Automobilių „duomenų bazė"
   const [carView, setCarView]                 = useState<'table' | 'kanban' | 'cards'>('cards');
@@ -396,9 +410,21 @@ export default function App() {
   };
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => setToast({ message, type });
+  // Teisių sargai: pilnam redagavimui ir koordinavimui. Grąžina true, jei leista.
+  const guardEdit = () => { if (!canEdit) { showToast(t('Neturite teisių atlikti šį veiksmą'), 'error'); return false; } return true; };
+  const guardCoord = () => { if (!canCoordinate) { showToast(t('Neturite teisių atlikti šį veiksmą'), 'error'); return false; } return true; };
+  // Rolės priskyrimas pagal el. paštą (per Supabase RPC; serveris tikrina teises).
+  const assignRole = async (email: string, newRole: Role) => {
+    if (!supabase) return;
+    const { error } = await supabase.rpc('set_user_role', { p_email: email.trim(), p_role: newRole });
+    if (error) { showToast(error.message, 'error'); return; }
+    showToast(t('Rolė priskirta'));
+    setRoleAdminOpen(false);
+  };
 
   // ── Driver Actions ────────────────────────────────────────────────────────────
   const addDriver = (d: Omit<Driver, 'id'>) => {
+    if (!guardEdit()) return;
     const driver = { ...d, id: uid() };
     setDrivers(prev => [...prev, driver]);
     logHistory(driver.id, driver.name, 'Pridėtas vairuotojas', 'Naujas vairuotojas įtrauktas');
@@ -407,6 +433,7 @@ export default function App() {
   };
 
   const updateDriver = (id: string, updates: Partial<Driver>) => {
+    if (!guardEdit()) return;
     setDrivers(prev => prev.map(d => d.id === id ? { ...d, ...updates } : d));
     if (updates.name) setPlans(prev => prev.map(p => ({
       ...p,
@@ -459,6 +486,7 @@ export default function App() {
   }, [importRows, drivers]);
 
   const applyImport = () => {
+    if (!guardEdit()) return;
     setDrivers(prev => {
       const next = [...prev];
       const index = buildDriverIndex(next);
@@ -486,6 +514,7 @@ export default function App() {
   };
 
   const deleteDriver = (id: string) => {
+    if (!guardEdit()) return;
     const d = drivers.find(x => x.id === id);
     if (!d) return;
     setPlans(prev => prev.filter(p => p.incomingDriverId !== id && p.leavingDriverId !== id));
@@ -495,6 +524,7 @@ export default function App() {
   };
 
   const sendHome = (id: string, homeStatus: HomeStatus, readinessDate: string) => {
+    if (!guardEdit()) return;
     const d = drivers.find(x => x.id === id);
     if (!d) return;
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -506,6 +536,7 @@ export default function App() {
   };
 
   const sendToTrip = (id: string, carNumber: string, startDate: string, plannedReturn: string) => {
+    if (!guardEdit()) return;
     const d = drivers.find(x => x.id === id);
     if (!d) return;
     setCarAssignments(prev => {
@@ -524,12 +555,14 @@ export default function App() {
 
   // ── Car Actions ───────────────────────────────────────────────────────────────
   const addCar = (c: Omit<Car, 'id'>) => {
+    if (!guardEdit()) return;
     setCars(prev => [...prev, { ...c, id: uid() }]);
     setAddCarOpen(false);
     showToast(`Automobilis ${c.number} pridėtas`);
   };
 
   const updateCar = (id: string, updates: Partial<Car>) => {
+    if (!guardEdit()) return;
     setCars(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
     setEditCarOpen(false); setSelectedCarForEdit(null);
     showToast('Automobilis atnaujintas');
@@ -569,6 +602,7 @@ export default function App() {
   }, [carImportRows, cars]);
 
   const applyCarImport = () => {
+    if (!guardEdit()) return;
     setCars(prev => {
       const next = [...prev];
       const index = buildCarIndex(next);
@@ -591,6 +625,7 @@ export default function App() {
   };
 
   const deleteCar = (id: string) => {
+    if (!guardEdit()) return;
     const car = cars.find(c => c.id === id);
     if (!car) return;
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -608,6 +643,7 @@ export default function App() {
 
   // ── Plan Actions ──────────────────────────────────────────────────────────────
   const createPlan = (carNumber: string, leavingId: string | null, incomingId: string, date: string, returnDate?: string) => {
+    if (!guardEdit()) return;
     if (plans.some(p => p.carNumber === carNumber && p.date === date && p.status === 'Suplanuota')) {
       showToast(`Šiai datai jau yra planas (${carNumber})`, 'error'); return;
     }
@@ -626,6 +662,7 @@ export default function App() {
   };
 
   const deletePlan = (planId: string) => {
+    if (!guardEdit()) return;
     setPlans(prev => prev.filter(p => p.id !== planId));
     showToast('Planas atšauktas');
   };
@@ -634,6 +671,7 @@ export default function App() {
   // Priskiria vairuotoją mašinai (vienas vairuotojas — vienoje vietoje;
   // viena mašina — vienas keitimas). Galima tempti tarp mašinų.
   const assignDraft = (carNumber: string, incomingDriverId: string) => {
+    if (!guardEdit()) return;
     setDrafts(prev => {
       // pašalinam vairuotoją iš kitur ir mašiną iš kitur, tada pridedam
       const cleaned = prev.filter(d => d.incomingDriverId !== incomingDriverId && d.carNumber !== carNumber);
@@ -645,6 +683,7 @@ export default function App() {
   const setDraftDate = (carNumber: string, date: string) => setDrafts(prev => prev.map(d => d.carNumber === carNumber ? { ...d, date } : d));
   const clearDrafts = () => setDrafts([]);
   const confirmDrafts = () => {
+    if (!guardEdit()) return;
     if (drafts.length === 0) return;
     drafts.forEach(d => {
       const leaving = drivers.find(dr => dr.currentCar === d.carNumber && dr.status === 'Reise');
@@ -657,6 +696,7 @@ export default function App() {
   };
 
   const completePlan = (planId: string, execReturnDate?: string, actualDate?: string) => {
+    if (!guardEdit()) return;
     const plan = plans.find(p => p.id === planId);
     if (!plan) return;
     const execDate   = actualDate || plan.date;
@@ -682,6 +722,7 @@ export default function App() {
 
   // ── Atšaukti įvykdytą pakeitimą (klaidos taisymas) — completePlan inversija ──
   const undoCompletion = (planId: string) => {
+    if (!guardEdit()) return;
     const plan = plans.find(p => p.id === planId);
     if (!plan) return;
     const execDate = plan.date;
@@ -719,6 +760,7 @@ export default function App() {
   // ── Grafiko „drag": priskyrimo (kadencijos) juostos pastūmimas dienomis ──
   const shiftISO = (d: string, days: number) => format(addDays(parseISO(d), days), 'yyyy-MM-dd');
   const moveAssignment = (a: CarAssignment, deltaDays: number) => {
+    if (!guardEdit()) return;
     if (!deltaDays) return;
     setCarAssignments(prev => prev.map(x => x.id === a.id
       ? { ...x, startDate: shiftISO(x.startDate, deltaDays), endDate: x.endDate ? shiftISO(x.endDate, deltaDays) : null }
@@ -735,6 +777,7 @@ export default function App() {
 
   // ── Grafiko „drag": juostos krašto tempimas (pradžia ARBA pabaiga atskirai) ──
   const resizeAssignment = (a: CarAssignment, edge: 'start' | 'end', deltaDays: number) => {
+    if (!guardEdit()) return;
     if (!deltaDays) return;
     if (edge === 'start') {
       const ns = shiftISO(a.startDate, deltaDays);
@@ -763,6 +806,7 @@ export default function App() {
 
   // ── Grafiko „drag": planuojamo keitimo data (horizontaliai) ──
   const movePlanDate = (planId: string, deltaDays: number) => {
+    if (!guardEdit()) return;
     if (!deltaDays) return;
     const p = plans.find(x => x.id === planId); if (!p) return;
     setPlans(prev => prev.map(x => x.id === planId ? { ...x, date: shiftISO(x.date, deltaDays) } : x));
@@ -771,6 +815,7 @@ export default function App() {
 
   // ── Grafiko „drag": planuojamo keitimo perkėlimas ant kitos mašinos ──
   const movePlanToCar = (planId: string, newCar: string) => {
+    if (!guardEdit()) return;
     const p = plans.find(x => x.id === planId); if (!p || p.carNumber === newCar) return;
     if (!cars.some(c => c.number === newCar)) return;
     // Naujos mašinos dabartinis (atviras) vairuotojas tampa „išeinančiu".
@@ -785,21 +830,25 @@ export default function App() {
 
   // ── Koordinatorius: keitimo taško nustatymas / valymas plane ──
   const setPlanChangePoint = (planId: string, lat: number, lng: number, location: string) => {
+    if (!guardCoord()) return;
     setPlans(prev => prev.map(p => p.id === planId ? { ...p, changeLat: lat, changeLng: lng, changeLocation: location } : p));
     const p = plans.find(x => x.id === planId);
     if (p) showToast(`Keitimo taškas: ${p.carNumber} → ${location}`);
   };
   const clearPlanChangePoint = (planId: string) => {
+    if (!guardCoord()) return;
     setPlans(prev => prev.map(p => p.id === planId ? { ...p, changeLat: null, changeLng: null, changeLocation: null, changeTask: null } : p));
     showToast('Keitimo taškas pašalintas');
   };
   // Dviguba užduotis ant keitimo taško (keitimas + ką nuvežti) — eina į Kelionę kartu.
   const setPlanChangeTask = (planId: string, task: string) => {
+    if (!guardCoord()) return;
     setPlans(prev => prev.map(p => p.id === planId ? { ...p, changeTask: task || null } : p));
   };
 
   // ── Kalendoriaus pastabos (viena diena = viena pastaba) ──
   const setDayNote = (date: string, text: string) => {
+    if (!guardEdit()) return;
     setCalendarNotes(prev => {
       const exists = prev.find(n => n.date === date);
       if (!text.trim()) return prev.filter(n => n.date !== date);
@@ -810,19 +859,24 @@ export default function App() {
 
   // ── Koordinatoriaus papildomos užduotys (task points) ──
   const addTaskPoint = (t: Omit<TaskPoint, 'id'>) => {
+    if (!guardCoord()) return '';
     const id = uid();
     setTaskPoints(prev => [...prev, { ...t, id }]);
     showToast(t.saved ? `Užduotis išsaugota: ${t.title || t.location}` : `Užduotis pridėta: ${t.title || t.location}`);
     return id;
   };
-  const updateTaskPoint = (id: string, updates: Partial<TaskPoint>) =>
+  const updateTaskPoint = (id: string, updates: Partial<TaskPoint>) => {
+    if (!guardCoord()) return;
     setTaskPoints(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+  };
   const deleteTaskPoint = (id: string) => {
+    if (!guardCoord()) return;
     setTaskPoints(prev => prev.filter(t => t.id !== id));
     showToast('Užduotis pašalinta');
   };
   // Iš išsaugoto šablono sukuriam aktyvią (siunčiamą į Kelionę) užduotį.
   const activateSavedTask = (tpl: TaskPoint) => {
+    if (!guardCoord()) return;
     addTaskPoint({ title: tpl.title, description: tpl.description, lat: tpl.lat, lng: tpl.lng, location: tpl.location, saved: false, active: true });
   };
 
@@ -999,7 +1053,7 @@ export default function App() {
             <NavItem active={activeTab === 'planning'} onClick={() => go('planning')} icon={<ArrowRightLeft size={17}/>} label={t('Planavimas')} badge={urgentCount} />
             <NavItem active={activeTab === 'calendar'} onClick={() => go('calendar')} icon={<Calendar size={17}/>} label={t('Kalendorius')} />
             <NavItem active={activeTab === 'auto-grafikas'} onClick={() => go('auto-grafikas')} icon={<LayoutDashboard size={17}/>} label={t('Grafikas')} />
-            <NavItem active={activeTab === 'draft'} onClick={() => go('draft')} icon={<ClipboardList size={17}/>} label={t('Keitimo juodraštis')} badge={drafts.length || undefined} />
+            {canEdit && <NavItem active={activeTab === 'draft'} onClick={() => go('draft')} icon={<ClipboardList size={17}/>} label={t('Keitimo juodraštis')} badge={drafts.length || undefined} />}
             <NavItem active={activeTab === 'coordinator'} onClick={() => go('coordinator')} icon={<MapPin size={17}/>} label={t('Koordinatorius')} badge={coordinatorPending} />
             <NavItem active={activeTab === 'trip'} onClick={() => go('trip')} icon={<MapIcon size={17}/>} label={t('Kelionė')} />
           </NavGroup>
@@ -1042,6 +1096,16 @@ export default function App() {
             </div>
             <div className="flex-1" />
             <div className="flex items-center gap-2">
+              {/* Vartotojo rolė (pilnų teisių vartotojui — mygtukas į rolių valdymą) */}
+              {isSupabaseEnabled && (isAdmin ? (
+                <button onClick={() => setRoleAdminOpen(true)} title={t('Tvarkyti roles')} className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-semibold bg-gold/15 text-ink ring-1 ring-gold/30 hover:bg-gold/25 transition-all">
+                  <UserCog size={13} /> {t(ROLE_LABELS[role])}
+                </button>
+              ) : (
+                <span title={t('Rolė')} className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-semibold bg-ink/[0.06] text-muted">
+                  {canEdit ? <UserCog size={13} /> : <Lock size={13} />} {t(ROLE_LABELS[role])}
+                </span>
+              ))}
               {/* Kalbos perjungiklis LT / RU */}
               <div className="flex items-center bg-ink/[0.06] rounded-full p-0.5" role="group" aria-label={t('Kalba')}>
                 {(['lt', 'ru'] as Lang[]).map(l => (
@@ -1050,12 +1114,12 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              {(activeTab === 'cars' || activeTab === 'dashboard') && (
+              {canEdit && (activeTab === 'cars' || activeTab === 'dashboard') && (
                 <button onClick={() => setAddCarOpen(true)} className="flex items-center gap-1.5 bg-surface border border-hairline text-ink px-3.5 py-2 rounded-full text-xs font-medium hover:border-ink/25 transition-all">
                   <Plus size={14}/><span className="hidden sm:inline">{t('Automobilis')}</span>
                 </button>
               )}
-              {(activeTab === 'drivers' || activeTab === 'dashboard' || activeTab === 'planning') && (
+              {canEdit && (activeTab === 'drivers' || activeTab === 'dashboard' || activeTab === 'planning') && (
                 <button onClick={() => setAddDriverOpen(true)} className="flex items-center gap-1.5 bg-ink text-white px-3.5 py-2 rounded-full text-xs font-medium hover:bg-ink/85 transition-all">
                   <UserPlus size={14}/><span className="hidden sm:inline">{t('Vairuotojas')}</span>
                 </button>
@@ -1129,7 +1193,7 @@ export default function App() {
                         </div>
                         <div className="grid gap-3">
                           {wPlans.sort((a,b) => a.date.localeCompare(b.date)).map(plan => (
-                            <PlanCard key={plan.id} plan={plan} drivers={drivers} cars={cars} plans={plans}
+                            <PlanCard key={plan.id} plan={plan} canEdit={canEdit} drivers={drivers} cars={cars} plans={plans}
                               onComplete={() => {
                                 setConfirmData({ carNumber: plan.carNumber, leavingId: plan.leavingDriverId, incomingId: plan.incomingDriverId, date: plan.date, driverName: plan.incomingDriverName, planId: plan.id, isExecution: true });
                                 if (plan.newPlannedReturnDate) setNewReturnDate(plan.newPlannedReturnDate);
@@ -1157,7 +1221,7 @@ export default function App() {
                 : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-2">
                     {namuoseDrivers.map(d => (
-                      <HomeDriverCard key={d.id} driver={d} onSendToTrip={() => { setSelectedDriverForTrip(d); setTripOpen(true); }} />
+                      <HomeDriverCard key={d.id} driver={d} canEdit={canEdit} onSendToTrip={() => { setSelectedDriverForTrip(d); setTripOpen(true); }} />
                     ))}
                   </div>
                 )
@@ -1201,6 +1265,7 @@ export default function App() {
         {/* ══════════════════ PLANNING ══════════════════ */}
         {activeTab === 'planning' && (
           <div className="space-y-6">
+            {!canEdit && <ReadOnlyNotice text={role === 'coordinator' ? t('Redaguoti galite tik Koordinatoriaus skiltyje') : t('Tik stebėjimas — redaguoti negalite')} />}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left: who to replace */}
               <div className="bg-surface rounded-2xl border border-hairline p-6 space-y-5">
@@ -1464,12 +1529,12 @@ export default function App() {
                 </div>
                 <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-hairline">
                   <span className="text-[11px] text-muted">{d.status === 'Reise' ? `${t('Grįžta')} ${d.plannedReturnDate || '?'}` : `${t('Laisvas')} ${d.readinessDate || '?'}`}</span>
-                  <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
+                  {canEdit && <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
                     {d.status === 'Reise'
                       ? <button onClick={() => { setSelectedDriverForHome(d); setHomeOpen(true); }} className="px-2 py-1 bg-emerald-500 text-white text-[10px] font-bold rounded-md hover:bg-emerald-600 transition-colors">{t('Namo')}</button>
                       : <button onClick={() => { setSelectedDriverForTrip(d); setTripOpen(true); }} className="px-2 py-1 bg-ink text-white text-[10px] font-bold rounded-md hover:bg-ink/85 transition-colors">{t('Į reisą')}</button>}
                     <button onClick={() => { setSelectedDriverForEdit(d); setEditDriverOpen(true); }} className="p-1.5 bg-ink/[0.05] text-ink rounded-md hover:bg-ink hover:text-white transition-all"><Edit size={12} /></button>
-                  </div>
+                  </div>}
                 </div>
               </div>
             );
@@ -1502,7 +1567,7 @@ export default function App() {
                 </select>
                 <input placeholder={t('Paieška...')} className={cn(inputCls, 'w-36')} value={driverFilter.search} onChange={e => setDriverFilter(p => ({ ...p, search: e.target.value }))} />
                 <button onClick={() => exportDriversCSV(fd)} title={t('Eksportuoti visus į CSV')} className="p-2 rounded-lg border border-hairline text-muted hover:text-ink hover:border-ink/30 transition-all"><Download size={15} /></button>
-                <button onClick={() => { setImportRows([]); setImportMeta(null); setImportErr(null); setImportOpen(true); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ink text-white text-xs font-semibold hover:bg-ink/85 transition-all"><Upload size={14} /> {t('Importuoti Excel')}</button>
+                {canEdit && <button onClick={() => { setImportRows([]); setImportMeta(null); setImportErr(null); setImportOpen(true); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ink text-white text-xs font-semibold hover:bg-ink/85 transition-all"><Upload size={14} /> {t('Importuoti Excel')}</button>}
               </div>
             </div>
 
@@ -1543,11 +1608,13 @@ export default function App() {
                           <td className="px-4 py-3 text-xs">{d.status === 'Reise' ? <span className="text-stone-500">{t('Grįžta')}: <strong>{d.plannedReturnDate || '?'}</strong></span> : <span className="text-stone-500">{t('Gali')}: <strong>{d.readinessDate || '?'}</strong></span>}</td>
                           <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                             <div className="flex justify-end gap-1.5">
+                              {canEdit ? <>
                               {d.status === 'Reise'
                                 ? <button onClick={() => { setSelectedDriverForHome(d); setHomeOpen(true); }} className="px-2.5 py-1 bg-emerald-500 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-600 transition-colors">{t('Namo')}</button>
                                 : <button onClick={() => { setSelectedDriverForTrip(d); setTripOpen(true); }} className="px-2.5 py-1 bg-ink text-white text-[10px] font-bold rounded-lg hover:bg-ink/85 transition-colors">{t('Į reisą')}</button>}
                               <button onClick={() => { setSelectedDriverForEdit(d); setEditDriverOpen(true); }} className="p-1.5 bg-ink/[0.05] text-ink hover:bg-ink hover:text-white rounded-lg transition-all"><Edit size={13} /></button>
                               <button onClick={() => deleteDriver(d.id)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Trash2 size={13} /></button>
+                              </> : <span className="text-[10px] text-stone-300">—</span>}
                             </div>
                           </td>
                         </tr>
@@ -1636,7 +1703,7 @@ export default function App() {
                   {plan && <span className="ml-auto text-[9px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full shrink-0">{t('PLANAS')} {format(parseISO(plan.date), 'MM.dd')}</span>}
                 </div>
 
-                {!driver && (
+                {!driver && canEdit && (
                   <button onClick={e => { e.stopPropagation(); setSelectedCarForAssignment(car.number); setTripOpen(true); }} className="w-full bg-ink text-white py-2 rounded-xl text-xs font-bold hover:bg-ink/85 transition-colors mt-3">{t('Priskirti vairuotoją')}</button>
                 )}
               </div>
@@ -1670,7 +1737,7 @@ export default function App() {
                 </select>
                 <input placeholder={t('Paieška...')} className={cn(inputCls, 'w-32')} value={carFilter.search} onChange={e => setCarFilter(p => ({ ...p, search: e.target.value }))} />
                 <button onClick={() => exportCarsCSV(fc)} title={t('Eksportuoti visus į CSV')} className="p-2 rounded-lg border border-hairline text-muted hover:text-ink hover:border-ink/30 transition-all"><Download size={15} /></button>
-                <button onClick={() => { setCarImportRows([]); setCarImportMeta(null); setCarImportErr(null); setCarImportOpen(true); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ink text-white text-xs font-semibold hover:bg-ink/85 transition-all"><Upload size={14} /> {t('Importuoti Excel')}</button>
+                {canEdit && <button onClick={() => { setCarImportRows([]); setCarImportMeta(null); setCarImportErr(null); setCarImportOpen(true); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ink text-white text-xs font-semibold hover:bg-ink/85 transition-all"><Upload size={14} /> {t('Importuoti Excel')}</button>}
               </div>
             </div>
 
@@ -1736,9 +1803,11 @@ export default function App() {
                           <td className="px-4 py-3 text-xs">{plan ? <span className="text-violet-600 font-semibold">{plan.incomingDriverName} · {format(parseISO(plan.date), 'MM.dd')}</span> : <span className="text-muted">—</span>}</td>
                           <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                             <div className="flex justify-end gap-1.5">
+                              {canEdit ? <>
                               {!driver && <button onClick={() => { setSelectedCarForAssignment(car.number); setTripOpen(true); }} className="px-2.5 py-1 bg-ink text-white text-[10px] font-bold rounded-lg hover:bg-ink/85 transition-colors">{t('Priskirti')}</button>}
                               <button onClick={() => { setSelectedCarForEdit(car); setEditCarOpen(true); }} className="p-1.5 bg-ink/[0.05] text-ink hover:bg-ink hover:text-white rounded-lg transition-all"><Edit size={13} /></button>
                               <button onClick={() => deleteCar(car.id)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"><Trash2 size={13} /></button>
+                              </> : <span className="text-[10px] text-stone-300">—</span>}
                             </div>
                           </td>
                         </tr>
@@ -2079,6 +2148,7 @@ export default function App() {
         {/* ══════════════════ KOORDINATORIUS (keitimo taškai) ══════════════════ */}
         {activeTab === 'coordinator' && (
           <div className="space-y-5">
+            {!canCoordinate && <ReadOnlyNotice text={t('Tik stebėjimas — redaguoti negalite')} />}
             <PageBanner h="xtall" bg={<EuropeMap className="w-full h-full opacity-90" />} eyebrow="Koordinavimas" title="Keitimo taškai Europoje" subtitle="Pažymėkite, kur įvyks pamaina — taškai keliauja į Kelionę" />
             <CoordinatorBoard
               plans={plans} cars={cars} drivers={drivers} taskPoints={taskPoints}
@@ -2092,18 +2162,21 @@ export default function App() {
         {/* ══════════════════ KELIONĖ (žemėlapis) ══════════════════ */}
         {activeTab === 'trip' && (
           <div className="space-y-5">
+            {!canEdit && <ReadOnlyNotice text={role === 'coordinator' ? t('Redaguoti galite tik Koordinatoriaus skiltyje') : t('Tik stebėjimas — redaguoti negalite')} />}
             <PageBanner h="xtall" bg={<EuropeMap className="w-full h-full opacity-90" />}
               eyebrow="Logistika" title="Keitimo kelionės planavimas" subtitle="Mikroautobusai, maršrutai ir užduotys viename žemėlapyje" />
             <TripPlanner drivers={drivers} plans={plans} cars={cars} taskPoints={taskPoints} onConsumeTask={(id) => updateTaskPoint(id, { active: false })} showToast={(msg, type) => setToast({ message: msg, type: type ?? 'success' })} />
           </div>
         )}
 
-        {/* Reset */}
+        {/* Reset — tik pilnų teisių vartotojas */}
+        {isAdmin && (
         <div className="text-center pt-4">
           <button onClick={() => { if (confirm('Atstatyti sistemą? Visi duomenys bus prarasti.')) { setDrivers(INITIAL_DRIVERS); setCars(INITIAL_CARS); setHistory([]); setPlans([]); setCarAssignments([]); localStorage.clear(); showToast('Sistema atstatyta'); }}} className="text-[10px] font-bold text-stone-300 hover:text-stone-500 transition-colors uppercase tracking-widest">
             Sistemos atstatymas
           </button>
         </div>
+        )}
       </main>
 
       {/* ══════════════════ MODALS ══════════════════ */}
@@ -2289,6 +2362,28 @@ export default function App() {
             )}
           </div>
         </div>
+      )}
+
+      {/* ── Rolių valdymas (tik pilnų teisių vartotojui) ── */}
+      {roleAdminOpen && isAdmin && (
+        <Modal title={t('Vartotojų rolės')} onClose={() => setRoleAdminOpen(false)}>
+          <form className="space-y-4" onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); void assignRole(f.get('email') as string, f.get('role') as Role); }}>
+            <div className="flex items-start gap-2 text-[11px] text-muted bg-gold/5 border border-gold/20 rounded-xl px-3 py-2.5">
+              <ShieldCheck size={14} className="text-gold shrink-0 mt-0.5" />
+              <span>{t('Rolė rišama prie paskyros; vartotojas jos pats pakeisti negali.')}</span>
+            </div>
+            <Field label={t('Vartotojo el. paštas')}><input name="email" type="email" required placeholder="vardas@imone.lt" className={inputCls} /></Field>
+            <Field label={t('Pasirinkite rolę')}>
+              <select name="role" required defaultValue="" className={selectCls}>
+                <option value="" disabled>{t('Pasirinkite rolę')}</option>
+                <option value="replacement">{t('Keitimų vadybininkas')}</option>
+                <option value="coordinator">{t('Koordinatorius')}</option>
+                <option value="transport">{t('Transporto vadybininkas')}</option>
+              </select>
+            </Field>
+            <button type="submit" className="w-full inline-flex items-center justify-center gap-2 bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors"><UserCog size={15} /> {t('Priskirti rolę')}</button>
+          </form>
+        </Modal>
       )}
 
       {addDriverOpen && (
@@ -2498,7 +2593,7 @@ export default function App() {
       {/* Vairuotojo profilio šoninė panelė (drawer) */}
       {profileDriver && (
         <DriverProfileDrawer
-          driver={profileDriver}
+          driver={profileDriver} canEdit={canEdit}
           plans={plans} carAssignments={carAssignments} history={history}
           onClose={() => setProfileDriver(null)}
           onTrip={(d) => { setProfileDriver(null); setSelectedDriverForTrip(d); setTripOpen(true); }}
@@ -2510,7 +2605,7 @@ export default function App() {
       {/* Automobilio profilio drawer */}
       {profileCar && (
         <CarProfileDrawer
-          car={profileCar} drivers={drivers} plans={plans} carAssignments={carAssignments} history={history}
+          car={profileCar} canEdit={canEdit} drivers={drivers} plans={plans} carAssignments={carAssignments} history={history}
           onClose={() => setProfileCar(null)}
           onAssign={(c) => { setProfileCar(null); setSelectedCarForAssignment(c.number); setTripOpen(true); }}
           onEdit={(c) => { setProfileCar(null); setSelectedCarForEdit(c); setEditCarOpen(true); }}
@@ -2681,8 +2776,8 @@ function MonthNav({ value, onChange }: { value: Date; onChange: (d: Date) => voi
 // dešinėje pusėje rodoma line-art detalė (pvz. mikroautobusas).
 // Vairuotojo profilio šoninė panelė: kontaktai, būsena, dabartinė mašina,
 // susiję planai, priskyrimų ir veiksmų istorija + greiti veiksmai.
-function DriverProfileDrawer({ driver, plans, carAssignments, history, onClose, onTrip, onHome, onEdit }: {
-  driver: Driver; plans: ReplacementPlan[]; carAssignments: CarAssignment[]; history: HistoryEntry[];
+function DriverProfileDrawer({ driver, canEdit, plans, carAssignments, history, onClose, onTrip, onHome, onEdit }: {
+  driver: Driver; canEdit: boolean; plans: ReplacementPlan[]; carAssignments: CarAssignment[]; history: HistoryEntry[];
   onClose: () => void; onTrip: (d: Driver) => void; onHome: (d: Driver) => void; onEdit: (d: Driver) => void;
 }) {
   const t = useT();
@@ -2746,13 +2841,15 @@ function DriverProfileDrawer({ driver, plans, carAssignments, history, onClose, 
             </>)}
           </div>
 
-          {/* Greiti veiksmai */}
+          {/* Greiti veiksmai — tik turintiems redagavimo teises */}
+          {canEdit && (
           <div className="flex gap-2">
             {d.status === 'Reise'
               ? <button onClick={() => onHome(d)} className="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-600 transition-colors"><LogOut size={15} /> {t('Siųsti namo')}</button>
               : <button onClick={() => onTrip(d)} className="flex-1 inline-flex items-center justify-center gap-2 bg-ink text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-ink/85 transition-colors"><LogIn size={15} /> {t('Siųsti į reisą')}</button>}
             <button onClick={() => onEdit(d)} className="inline-flex items-center justify-center gap-2 px-4 bg-ink/[0.05] text-ink rounded-xl text-sm font-semibold hover:bg-ink hover:text-white transition-all"><Edit size={15} /></button>
           </div>
+          )}
 
           {/* Dokumentai ir galiojimai */}
           {(d.docs || d.email || d.tabNr) && (() => {
@@ -2856,8 +2953,8 @@ function DriverProfileDrawer({ driver, plans, carAssignments, history, onClose, 
 
 // Automobilio profilio šoninė panelė: dabartinis vairuotojas, priskyrimų
 // istorija, susiję planai, žurnalas + greiti veiksmai.
-function CarProfileDrawer({ car, drivers, plans, carAssignments, history, onClose, onAssign, onEdit }: {
-  car: Car; drivers: Driver[]; plans: ReplacementPlan[]; carAssignments: CarAssignment[]; history: HistoryEntry[];
+function CarProfileDrawer({ car, canEdit, drivers, plans, carAssignments, history, onClose, onAssign, onEdit }: {
+  car: Car; canEdit: boolean; drivers: Driver[]; plans: ReplacementPlan[]; carAssignments: CarAssignment[]; history: HistoryEntry[];
   onClose: () => void; onAssign: (c: Car) => void; onEdit: (c: Car) => void;
 }) {
   const t = useT();
@@ -2903,15 +3000,17 @@ function CarProfileDrawer({ car, drivers, plans, carAssignments, history, onClos
             </> : (
               <div className="flex items-center justify-between mt-1">
                 <span className="text-sm text-muted italic">{t('Mašina laisva')}</span>
-                <button onClick={() => onAssign(car)} className="px-3 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-ink/85 transition-colors">{t('Priskirti')}</button>
+                {canEdit && <button onClick={() => onAssign(car)} className="px-3 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-ink/85 transition-colors">{t('Priskirti')}</button>}
               </div>
             )}
           </div>
 
+          {canEdit && (
           <div className="flex gap-2">
             {!driver && <button onClick={() => onAssign(car)} className="flex-1 inline-flex items-center justify-center gap-2 bg-ink text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-ink/85 transition-colors"><LogIn size={15} /> {t('Priskirti vairuotoją')}</button>}
             <button onClick={() => onEdit(car)} className={cn("inline-flex items-center justify-center gap-2 px-4 bg-ink/[0.05] text-ink rounded-xl text-sm font-semibold hover:bg-ink hover:text-white transition-all", !driver ? "" : "flex-1 py-2.5")}><Edit size={15} /> {driver && t('Redaguoti')}</button>
           </div>
+          )}
 
           {relPlans.length > 0 && (
             <div>
@@ -2985,7 +3084,7 @@ function EmptyState({ icon, text, variant = 'road' }: { icon?: React.ReactNode; 
   );
 }
 
-function HomeDriverCard({ driver, onSendToTrip }: { driver: Driver; onSendToTrip: () => void }) {
+function HomeDriverCard({ driver, canEdit, onSendToTrip }: { driver: Driver; canEdit: boolean; onSendToTrip: () => void }) {
   const t = useT();
   // Ar jau galima siųsti (poilsis pasibaigęs)?
   const ready = driver.readinessDate ? !isAfter(parseISO(driver.readinessDate), new Date()) : true;
@@ -3002,14 +3101,15 @@ function HomeDriverCard({ driver, onSendToTrip }: { driver: Driver; onSendToTrip
         <p className="text-[8px] uppercase tracking-wide text-muted">{ready ? t('Galima') : t('Poilsis iki')}</p>
         <p className={cn("text-[11px] font-semibold tabular-nums", ready ? "text-emerald-600" : "text-blue-600")}>{driver.readinessDate || '—'}</p>
       </div>
-      <button onClick={onSendToTrip} title={t('Siųsti į reisą')} className="shrink-0 w-8 h-8 rounded-lg bg-ink/[0.06] text-ink hover:bg-ink hover:text-white flex items-center justify-center transition-all">
+      {canEdit && <button onClick={onSendToTrip} title={t('Siųsti į reisą')} className="shrink-0 w-8 h-8 rounded-lg bg-ink/[0.06] text-ink hover:bg-ink hover:text-white flex items-center justify-center transition-all">
         <ArrowRight size={15}/>
-      </button>
+      </button>}
     </div>
   );
 }
 
-function PlanCard({ plan, drivers, cars, plans, onComplete, onDelete, onEdit, editingPlanId, setEditingPlanId, setPlans }: {
+function PlanCard({ plan, canEdit = true, drivers, cars, plans, onComplete, onDelete, onEdit, editingPlanId, setEditingPlanId, setPlans }: {
+  canEdit?: boolean;
   plan: ReplacementPlan; drivers: Driver[]; cars: Car[]; plans: ReplacementPlan[];
   onComplete: () => void; onDelete: () => void; onEdit: () => void;
   editingPlanId: string | null; setEditingPlanId: (id: string | null) => void;
@@ -3073,12 +3173,14 @@ function PlanCard({ plan, drivers, cars, plans, onComplete, onDelete, onEdit, ed
           </div>
         </div>
 
-        {/* Veiksmai */}
+        {/* Veiksmai — tik turintiems redagavimo teises */}
+        {canEdit && (
         <div className="flex sm:flex-col gap-2 border-t sm:border-t-0 sm:border-l border-hairline pt-3 sm:pt-0 sm:pl-4 w-full sm:w-auto">
           <button onClick={onComplete} className="flex-1 sm:flex-none p-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-xl transition-all" title="Įvykdyta"><CheckCircle2 size={16}/></button>
           <button onClick={onEdit}    className="flex-1 sm:flex-none p-2.5 bg-ink/[0.05] text-ink hover:bg-ink hover:text-white rounded-xl transition-all" title="Redaguoti"><Edit size={16}/></button>
           <button onClick={onDelete}  className="flex-1 sm:flex-none p-2.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all" title="Ištrinti"><X size={16}/></button>
         </div>
+        )}
       </div>
 
       {/* Keitimo taškas / užduotis (jei nustatyta koordinatoriaus) */}

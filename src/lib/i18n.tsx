@@ -252,6 +252,21 @@ const RU: Record<string, string> = {
   'Veiksmų žurnalas': 'Журнал действий',
   'Nėra įrašų': 'Нет записей',
 
+  // — Rolės / teisės —
+  'Neturite teisių atlikti šį veiksmą': 'У вас нет прав на это действие',
+  'Keitimų vadybininkas': 'Менеджер замен',
+  'Transporto vadybininkas': 'Менеджер транспорта',
+  'Rolė': 'Роль',
+  'Tik stebėjimas — redaguoti negalite': 'Только просмотр — редактирование недоступно',
+  'Redaguoti galite tik Koordinatoriaus skiltyje': 'Редактировать можно только в разделе Координатор',
+  'Vartotojų rolės': 'Роли пользователей',
+  'Priskirti rolę': 'Назначить роль',
+  'Vartotojo el. paštas': 'Эл. почта пользователя',
+  'Rolė priskirta': 'Роль назначена',
+  'Pasirinkite rolę': 'Выберите роль',
+  'Tvarkyti roles': 'Управление ролями',
+  'Rolė rišama prie paskyros; vartotojas jos pats pakeisti negali.': 'Роль привязана к аккаунту; пользователь сам её изменить не может.',
+
   // — Tuščios būsenos —
   'Nėra duomenų': 'Нет данных',
   'Nieko nerasta': 'Ничего не найдено',
