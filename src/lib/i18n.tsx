@@ -274,6 +274,15 @@ const RU: Record<string, string> = {
   'Pasirinkite rolę': 'Выберите роль',
   'Tvarkyti roles': 'Управление ролями',
   'Rolė rišama prie paskyros; vartotojas jos pats pakeisti negali.': 'Роль привязана к аккаунту; пользователь сам её изменить не может.',
+  'Kūrėjas': 'Создатель',
+  'Kūrėjo prieiga': 'Доступ создателя',
+  'Kūrėjo kodas': 'Код создателя',
+  'Įjungti Kūrėjo režimą': 'Включить режим создателя',
+  'Išjungti Kūrėjo režimą': 'Выключить режим создателя',
+  'Kūrėjo režimas įjungtas': 'Режим создателя включён',
+  'Kūrėjo režimas išjungtas': 'Режим создателя выключен',
+  'Neteisingas kodas': 'Неверный код',
+  'Kūrėjo rolė suteikia pilną prieigą prie visų pakeitimų, rolių valdymo ir sistemos atstatymo.': 'Роль создателя даёт полный доступ ко всем изменениям, управлению ролями и сбросу системы.',
 
   // — Tuščios būsenos —
   'Nėra duomenų': 'Нет данных',

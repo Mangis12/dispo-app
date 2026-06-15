@@ -223,7 +223,7 @@ export default function App() {
   const { lang, setLang } = useLang();
   const t = useT();
   const dfLocale = lang === 'ru' ? ru : lt;
-  const { role, canEdit, canCoordinate, isAdmin } = useRole();
+  const { role, canEdit, canCoordinate, isAdmin, kurejasUnlocked, unlockKurejas, lockKurejas } = useRole();
   const [drivers, setDrivers]           = useState<Driver[]>([]);
   const [cars, setCars]                 = useState<Car[]>([]);
   const [history, setHistory]           = useState<HistoryEntry[]>([]);
@@ -291,6 +291,7 @@ export default function App() {
   const [drafts, setDrafts] = useState<{ carNumber: string; incomingDriverId: string; date: string }[]>([]);
   // Rolių administravimo langas (tik pilnų teisių vartotojui)
   const [roleAdminOpen, setRoleAdminOpen] = useState(false);
+  const [kurejasCodeOpen, setKurejasCodeOpen] = useState(false);
   // Bendras patvirtinimo langas (taip/ne prieš įvykdant veiksmą)
   const [confirmAsk, setConfirmAsk] = useState<{ title: string; message: React.ReactNode; confirmLabel?: string; danger?: boolean; onConfirm: () => void } | null>(null);
   const askConfirm = (opts: { title: string; message: React.ReactNode; confirmLabel?: string; danger?: boolean; onConfirm: () => void }) => setConfirmAsk(opts);
@@ -1099,16 +1100,16 @@ export default function App() {
             </div>
             <div className="flex-1" />
             <div className="flex items-center gap-2">
-              {/* Vartotojo rolė (pilnų teisių vartotojui — mygtukas į rolių valdymą) */}
-              {isSupabaseEnabled && (isAdmin ? (
-                <button onClick={() => setRoleAdminOpen(true)} title={t('Tvarkyti roles')} className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-semibold bg-gold/15 text-ink ring-1 ring-gold/30 hover:bg-gold/25 transition-all">
-                  <UserCog size={13} /> {t(ROLE_LABELS[role])}
-                </button>
-              ) : (
-                <span title={t('Rolė')} className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-semibold bg-ink/[0.06] text-muted">
-                  {canEdit ? <UserCog size={13} /> : <Lock size={13} />} {t(ROLE_LABELS[role])}
-                </span>
-              ))}
+              {/* Vartotojo rolė. Kūrėjas → rolių valdymas; kiti → Kūrėjo kodo įvedimas. */}
+              <button
+                onClick={() => isAdmin ? setRoleAdminOpen(true) : setKurejasCodeOpen(true)}
+                title={isAdmin ? t('Tvarkyti roles') : t('Kūrėjo prieiga')}
+                className={cn(
+                  'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-all',
+                  isAdmin ? 'bg-gold/15 text-ink ring-1 ring-gold/30 hover:bg-gold/25' : 'bg-ink/[0.06] text-muted hover:bg-ink/10'
+                )}>
+                {isAdmin ? <ShieldCheck size={13} /> : canEdit ? <UserCog size={13} /> : <Lock size={13} />} {t(ROLE_LABELS[role])}
+              </button>
               {/* Kalbos perjungiklis LT / RU */}
               <div className="flex items-center bg-ink/[0.06] rounded-full p-0.5" role="group" aria-label={t('Kalba')}>
                 {(['lt', 'ru'] as Lang[]).map(l => (
@@ -2448,6 +2449,31 @@ export default function App() {
               </select>
             </Field>
             <button type="submit" className="w-full inline-flex items-center justify-center gap-2 bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors"><UserCog size={15} /> {t('Priskirti rolę')}</button>
+          </form>
+          {kurejasUnlocked && (
+            <button type="button" onClick={() => { lockKurejas(); setRoleAdminOpen(false); showToast(t('Kūrėjo režimas išjungtas')); }} className="mt-3 w-full inline-flex items-center justify-center gap-2 border border-hairline text-muted py-2.5 rounded-xl font-semibold text-sm hover:text-ink hover:border-ink/25 transition-colors"><Lock size={14} /> {t('Išjungti Kūrėjo režimą')}</button>
+          )}
+        </Modal>
+      )}
+
+      {/* ── Kūrėjo prieiga (slaptu kodu) ── */}
+      {kurejasCodeOpen && (
+        <Modal title={t('Kūrėjo prieiga')} onClose={() => setKurejasCodeOpen(false)}>
+          <form className="space-y-4" onSubmit={e => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            const ok = unlockKurejas((f.get('code') as string) || '');
+            if (ok) { showToast(t('Kūrėjo režimas įjungtas')); setKurejasCodeOpen(false); }
+            else showToast(t('Neteisingas kodas'), 'error');
+          }}>
+            <div className="flex items-start gap-2 text-[11px] text-muted bg-gold/5 border border-gold/20 rounded-xl px-3 py-2.5">
+              <ShieldCheck size={14} className="text-gold shrink-0 mt-0.5" />
+              <span>{t('Kūrėjo rolė suteikia pilną prieigą prie visų pakeitimų, rolių valdymo ir sistemos atstatymo.')}</span>
+            </div>
+            <Field label={t('Kūrėjo kodas')}>
+              <input name="code" type="password" inputMode="numeric" autoFocus required placeholder="••••" className={cn(inputCls, 'tracking-[0.4em] text-center font-mono')} />
+            </Field>
+            <button type="submit" className="w-full inline-flex items-center justify-center gap-2 bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors"><ShieldCheck size={15} /> {t('Įjungti Kūrėjo režimą')}</button>
           </form>
         </Modal>
       )}
