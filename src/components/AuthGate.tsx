@@ -49,12 +49,10 @@ function SupabaseAuthGate({ children }: { children: React.ReactNode }) {
   if (session) return <>{children}</>;
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center p-4 font-sans text-ink overflow-hidden bg-gradient-to-br from-surface via-canvas to-[#dde8f3]">
-      {/* DAF XF — visa mašina matoma (be apkarpymo), dešinėje pusėje */}
-      <div className="absolute inset-y-0 right-0 w-full lg:w-3/4 pointer-events-none">
-        <img src="/img/daf-xf.jpg" alt="DAF XF" className="absolute bottom-0 right-0 h-[62%] sm:h-[78%] w-auto max-w-full object-contain object-right-bottom opacity-95" />
-      </div>
-      <div className="absolute inset-0 bg-gradient-to-r from-canvas via-canvas/70 to-transparent" />
+    <div className="relative min-h-screen flex items-center justify-center p-4 font-sans text-ink overflow-hidden bg-gradient-to-br from-surface via-canvas to-[#e7ddcf]">
+      {/* Subtilus dekoratyvinis švytėjimas (be nuotraukos) */}
+      <div className="pointer-events-none absolute -top-24 -right-16 w-96 h-96 rounded-full bg-gold/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -left-16 w-96 h-96 rounded-full bg-ink/[0.04] blur-3xl" />
 
       <form onSubmit={signIn} className="relative reveal bg-surface/85 backdrop-blur-2xl w-full max-w-sm rounded-3xl shadow-float border border-white/70 ring-1 ring-gold/15 p-8 space-y-6">
         <div className="flex flex-col items-center gap-3">
