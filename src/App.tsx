@@ -7,7 +7,8 @@ import {
   List, LayoutGrid, Columns3, Download, Phone, Snowflake, Container,
   Upload, FileSpreadsheet, ShieldCheck, ShieldAlert, Contact, CreditCard, FileCheck2,
   ClipboardList, GripVertical, Check, Lock, UserCog,
-  UserX, UserMinus, RotateCcw, ChevronDown, Ban
+  UserX, UserMinus, RotateCcw, ChevronDown, Ban,
+  BellRing, AlertTriangle, Clock, Trash, Car as CarIcon
 } from 'lucide-react';
 import {
   format, differenceInDays, parseISO, isBefore, isAfter,
@@ -27,6 +28,11 @@ import { parseDriverWorkbook, mergeIntoDriver, buildDriverIndex, findExisting, b
 import { parseCarWorkbook, mergeIntoCar, buildCarIndex, findExistingCar, buildCarTemplate, type ParsedCar } from './lib/importCars';
 import { useLang, useT, useDateLocale, type Lang } from './lib/i18n';
 import { useRole, ROLE_LABELS, type Role } from './lib/roles';
+import {
+  loadReminders, saveReminders, isDue as reminderDue, snoozeReminder, fireDueReminders,
+  ensurePushPermission, pushPermission, REPEAT_LABELS,
+  type Reminder, type ReminderRepeat, type ReminderTarget,
+} from './lib/reminders';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
   ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment, TaskPoint, CalendarNote
@@ -67,6 +73,29 @@ function worstDocState(d: Driver): DocState {
     if (rank[s] > rank[worst]) worst = s;
   });
   return worst;
+}
+
+// Visi vairuotojo dokumentai su datomis (galiojimo pabaigos).
+type DocExpiry = { key: string; label: string; iso: string; days: number };
+function docExpiries(d: Driver): DocExpiry[] {
+  if (!d.docs) return [];
+  const out: DocExpiry[] = [];
+  DOC_FIELDS.forEach(f => {
+    const iso = d.docs![f.key] as string | undefined;
+    if (!iso || !isValid(parseISO(iso))) return;
+    out.push({ key: f.key, label: f.label, iso, days: differenceInDays(parseISO(iso), new Date()) });
+  });
+  return out.sort((a, b) => a.iso.localeCompare(b.iso));
+}
+// Dokumentai, kurie baigiasi ≤ N dienų (įsk. jau pasibaigusius).
+function docsExpiringWithin(d: Driver, days: number): DocExpiry[] {
+  return docExpiries(d).filter(x => x.days <= days);
+}
+// Anksčiausiai pasibaigiantis dokumentas iki nurodytos datos (ISO) — arba null.
+function docExpiringBefore(d: Driver, beforeISO: string): DocExpiry | null {
+  if (!beforeISO) return null;
+  const list = docExpiries(d).filter(x => x.iso < beforeISO);
+  return list[0] || null;
 }
 
 // ─── Initial Data ─────────────────────────────────────────────────────────────
@@ -267,6 +296,11 @@ export default function App() {
   const [showUnneeded, setShowUnneeded]                     = useState(false);
   const [homeSearch, setHomeSearch]                         = useState('');
   const [homeExpanded, setHomeExpanded]                     = useState<Record<string, boolean>>({});
+  // Priminimai („Mano priminimai") + Alert
+  const [reminders, setReminders]                           = useState<Reminder[]>(() => loadReminders());
+  const [remindersOpen, setRemindersOpen]                   = useState(false);
+  const [alertsOpen, setAlertsOpen]                         = useState(false);
+  const [reminderForm, setReminderForm]                     = useState<Partial<Reminder> | null>(null);
   const [selectedCarForEdit, setSelectedCarForEdit]         = useState<Car | null>(null);
   const [editAssignment, setEditAssignment]                 = useState<CarAssignment | null>(null);
   const [planGroup, setPlanGroup]                           = useState<'all' | CarType>('all');
@@ -506,6 +540,59 @@ export default function App() {
     showToast(t('Dokumentai atnaujinti'));
   };
 
+  // ── Priminimai („Mano priminimai") ────────────────────────────────────────────
+  // Žmogui suprantamas priminimo aprašymas (į push pranešimą ir sąrašą).
+  const describeReminder = (r: Reminder): string => {
+    const drv = r.driverId ? drivers.find(d => d.id === r.driverId) : null;
+    const car = r.carId ? cars.find(c => c.id === r.carId) : null;
+    const subj = drv?.name || car?.number || '';
+    if (r.target === 'document' && drv) {
+      const lbl = DOC_FIELDS.find(f => f.key === r.docKey)?.label || t('Dokumentas');
+      return `${r.title || t('Dokumentas')}: ${drv.name} · ${t(lbl)}`;
+    }
+    return subj ? `${r.title} · ${subj}` : r.title;
+  };
+
+  // Išsaugom priminimus lokaliai, kai keičiasi.
+  useEffect(() => { saveReminders(reminders); }, [reminders]);
+
+  // Auto push: patikrinam suėjusius — bet sujungtus į vieną pranešimą (be srauto).
+  // Tikrinam įkrovus ir kas 15 min.
+  useEffect(() => {
+    const run = () => setReminders(prev => {
+      const { list, fired } = fireDueReminders(prev, describeReminder);
+      return fired.length ? list : prev;
+    });
+    const timer = setTimeout(run, 1500); // truputį po įkrovos
+    const interval = setInterval(run, 15 * 60 * 1000);
+    return () => { clearTimeout(timer); clearInterval(interval); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drivers, cars]);
+
+  const saveReminder = async (r: Reminder) => {
+    await ensurePushPermission();
+    setReminders(prev => {
+      const exists = prev.some(x => x.id === r.id);
+      return exists ? prev.map(x => x.id === r.id ? r : x) : [r, ...prev];
+    });
+    setReminderForm(null);
+    showToast(t('Priminimas išsaugotas'));
+  };
+  const deleteReminder = (id: string) => setReminders(prev => prev.filter(r => r.id !== id));
+  const snoozeReminderBy = (id: string, days = 7) => setReminders(prev => prev.map(r => r.id === id ? snoozeReminder(r, days) : r));
+  const completeReminder = (id: string) => setReminders(prev => prev.map(r => r.id === id ? { ...r, done: true } : r));
+  // „Priminimai" mygtukas: parodom suėjusius kaip push (ir atidarom centrą).
+  const triggerReminders = async () => {
+    await ensurePushPermission();
+    setReminders(prev => { const { list, fired } = fireDueReminders(prev, describeReminder); return fired.length ? list : prev; });
+    setRemindersOpen(true);
+  };
+  // Greitas priminimas iš Alert / profilio (dokumentui ar vairuotojui).
+  const openReminderFor = (init: Partial<Reminder>) => {
+    setReminderForm({ repeat: 'weekly', target: 'custom', dueDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'), ...init });
+    setRemindersOpen(true);
+  };
+
   // ── Excel importas ──────────────────────────────────────────────────────────
   const downloadTemplate = (company: 'LT' | 'PL') => {
     const blob = buildDriverTemplate(company);
@@ -715,7 +802,14 @@ export default function App() {
     };
     setPlans(prev => [plan, ...prev]);
     logHistory(incomingId, incoming.name, 'Suplanuotas pakeitimas', `Auto: ${carNumber}, Data: ${date}`, carNumber, date);
-    showToast(`Planas sukurtas: ${incoming.name} → ${carNumber}`);
+    // Įspėjimas: ar vairuotojo dokumentas nepasibaigs iki kadencijos pabaigos?
+    const tenureEnd = returnDate || format(addDays(parseISO(date), 42), 'yyyy-MM-dd');
+    const badDoc = docExpiringBefore(incoming, tenureEnd);
+    if (badDoc) {
+      showToast(`⚠ ${incoming.name}: ${t(badDoc.label)} ${t('baigiasi')} ${badDoc.iso} — ${t('nebus iki kadencijos pabaigos, reikės kito vairuotojo')}`, 'error');
+    } else {
+      showToast(`Planas sukurtas: ${incoming.name} → ${carNumber}`);
+    }
   };
 
   const deletePlan = (planId: string) => {
@@ -1054,6 +1148,12 @@ export default function App() {
   // „Namuose" skydeliui/sąrašui = laisvi ir reikalingi (be atleistų ir nereikalingų).
   const namuoseDrivers = drivers.filter(d => d.status === 'Namuose' && !d.dismissedDate && !d.unneeded).sort((a, b) => (a.readinessDate || '').localeCompare(b.readinessDate || ''));
   const dismissedDrivers = drivers.filter(d => !!d.dismissedDate).sort((a, b) => (b.dismissedDate || '').localeCompare(a.dismissedDate || ''));
+  // Alert: vairuotojai kadencijoje (reise), kurių dokumentai baigiasi ≤30 d.
+  const alertDrivers = reiseDrivers
+    .map(d => ({ d, docs: docsExpiringWithin(d, 30) }))
+    .filter(x => x.docs.length > 0)
+    .sort((a, b) => (a.docs[0]?.iso || '').localeCompare(b.docs[0]?.iso || ''));
+  const dueReminders = reminders.filter(r => reminderDue(r));
   const activePlans   = plans.filter(p => p.status === 'Suplanuota');
   // Planai be nustatyto keitimo taško — koordinatoriaus „darbų" skaičius.
   const coordinatorPending = activePlans.filter(p => p.changeLat == null).length;
@@ -1155,6 +1255,16 @@ export default function App() {
             </div>
             <div className="flex-1" />
             <div className="flex items-center gap-2">
+              {/* Alert: dokumentai baigiasi (≤30 d.) vairuotojams kadencijoje */}
+              <button onClick={() => setAlertsOpen(true)} title={t('Įspėjimai')} className="relative inline-flex items-center justify-center w-9 h-9 rounded-full bg-ink/[0.06] text-muted hover:bg-ink/10 hover:text-ink transition-all">
+                <AlertTriangle size={16} className={cn(alertDrivers.length > 0 && 'text-amber-500')} />
+                {alertDrivers.length > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">{alertDrivers.length}</span>}
+              </button>
+              {/* Priminimai: paspaudus iššoka suėję priminimai (push) + atidaro centrą */}
+              <button onClick={triggerReminders} title={t('Priminimai')} className="relative inline-flex items-center justify-center w-9 h-9 rounded-full bg-ink/[0.06] text-muted hover:bg-ink/10 hover:text-ink transition-all">
+                {dueReminders.length > 0 ? <BellRing size={16} className="text-gold" /> : <Bell size={16} />}
+                {dueReminders.length > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-gold text-ink text-[9px] font-bold flex items-center justify-center">{dueReminders.length}</span>}
+              </button>
               {/* Vartotojo rolė. Kūrėjas → rolių valdymas; kiti → Kūrėjo kodo įvedimas. */}
               <button
                 onClick={() => isAdmin ? setRoleAdminOpen(true) : setKurejasCodeOpen(true)}
@@ -2269,6 +2379,17 @@ export default function App() {
                             <input type="date" value={dr.date} onChange={e => setDraftDate(car.number, e.target.value)} className="text-xs bg-canvas border border-hairline rounded-lg px-2 py-1 focus:outline-none focus:border-ink/40" />
                           </div>
                         )}
+                        {/* Įspėjimas: vairuotojo dokumentas baigsis iki kadencijos pabaigos */}
+                        {dr && incoming && (() => {
+                          const bad = docExpiringBefore(incoming, format(addDays(parseISO(dr.date), 42), 'yyyy-MM-dd'));
+                          if (!bad) return null;
+                          return (
+                            <div className="mt-2 flex items-start gap-1.5 text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5">
+                              <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+                              <span>{t(bad.label)} {t('baigiasi')} {bad.iso} — {t('neišbus iki kadencijos pabaigos, reikės kito vairuotojo')}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     );
                   })}
@@ -2642,6 +2763,94 @@ export default function App() {
             </Field>
             <button type="submit" className="w-full inline-flex items-center justify-center gap-2 bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors"><ShieldCheck size={15} /> {t('Įjungti Kūrėjo režimą')}</button>
           </form>
+        </Modal>
+      )}
+
+      {/* ── Mano priminimai (centras) ── */}
+      {remindersOpen && (
+        <Modal title={t('Mano priminimai')} onClose={() => { setRemindersOpen(false); setReminderForm(null); }}>
+          {reminderForm ? (
+            <ReminderEditor
+              drivers={drivers} cars={cars} initial={reminderForm}
+              onCancel={() => setReminderForm(null)}
+              onSave={(data) => saveReminder({ id: data.id || uid(), createdAt: data.createdAt || format(new Date(), 'yyyy-MM-dd'), ...data } as Reminder)}
+            />
+          ) : (
+            <div className="space-y-3">
+              {pushPermission() !== 'granted' && (
+                <button onClick={() => ensurePushPermission().then(ok => showToast(ok ? t('Push pranešimai įjungti') : t('Push pranešimai neleisti'), ok ? 'success' : 'error'))}
+                  className="w-full flex items-center justify-center gap-2 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 hover:bg-amber-100 transition-colors">
+                  <BellRing size={13} /> {t('Įjungti push pranešimus')}
+                </button>
+              )}
+              <button onClick={() => openReminderFor({ target: 'custom', title: '' })} className="w-full inline-flex items-center justify-center gap-2 bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors"><Plus size={15} /> {t('Naujas priminimas')}</button>
+              {reminders.length === 0
+                ? <p className="text-sm text-muted text-center py-6">{t('Priminimų dar nėra')}</p>
+                : (
+                  <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                    {[...reminders].sort((a, b) => (a.done === b.done ? a.dueDate.localeCompare(b.dueDate) : a.done ? 1 : -1)).map(r => {
+                      const due = reminderDue(r);
+                      return (
+                        <div key={r.id} className={cn('rounded-xl border px-3 py-2.5', r.done ? 'bg-stone-50 border-hairline opacity-60' : due ? 'bg-gold/[0.06] border-gold/30' : 'bg-surface border-hairline')}>
+                          <div className="flex items-start gap-2">
+                            <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0', due ? 'bg-gold/20 text-gold-soft' : 'bg-ink/[0.06] text-muted')}>
+                              {r.target === 'document' ? <FileCheck2 size={14} /> : r.target === 'car' ? <CarIcon size={14} /> : r.target === 'driver' ? <User size={14} /> : <Bell size={14} />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className={cn('text-[13px] font-semibold leading-tight', r.done && 'line-through')}>{describeReminder(r)}</p>
+                              {r.note && <p className="text-[11px] text-muted truncate">{r.note}</p>}
+                              <p className="text-[10px] text-muted mt-0.5 flex items-center gap-1.5">
+                                <Clock size={10} /> {r.dueDate} · {t(REPEAT_LABELS[r.repeat])}{due && !r.done && <span className="text-gold font-bold">· {t('suėjo')}</span>}
+                              </p>
+                            </div>
+                          </div>
+                          {!r.done && (
+                            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-hairline">
+                              <button onClick={() => snoozeReminderBy(r.id, 7)} className="flex-1 text-[10px] font-bold text-ink bg-ink/[0.05] hover:bg-ink/10 rounded-lg py-1.5 transition-colors">{t('Priminti po savaitės')}</button>
+                              <button onClick={() => completeReminder(r.id)} className="text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg px-2.5 py-1.5 transition-colors">{t('Atlikta')}</button>
+                              <button onClick={() => deleteReminder(r.id)} className="text-muted hover:text-red-500 p-1.5 transition-colors"><Trash size={13} /></button>
+                            </div>
+                          )}
+                          {r.done && <button onClick={() => deleteReminder(r.id)} className="mt-1.5 text-[10px] text-muted hover:text-red-500 transition-colors">{t('Ištrinti')}</button>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {/* ── Alert: dokumentai baigiasi vairuotojams kadencijoje (≤30 d.) ── */}
+      {alertsOpen && (
+        <Modal title={t('Įspėjimai · baigiasi dokumentai')} onClose={() => setAlertsOpen(false)}>
+          {alertDrivers.length === 0
+            ? <div className="text-center py-8"><ShieldCheck size={28} className="mx-auto text-emerald-400 mb-2" /><p className="text-sm text-muted">{t('Nėra vairuotojų su besibaigiančiais dokumentais')}</p></div>
+            : (
+              <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                <p className="text-[11px] text-muted">{t('Vairuotojai kadencijoje, kurių dokumentai baigiasi per 30 d.')}</p>
+                {alertDrivers.map(({ d, docs }) => (
+                  <div key={d.id} className="rounded-xl border border-hairline bg-surface p-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-[11px] font-semibold shrink-0">{d.name.split(' ').map(w => w[0]).slice(0, 2).join('')}</div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm truncate">{d.name}</p>
+                        <p className="text-[10px] text-muted truncate font-mono">{d.currentCar} · {d.companyType} · {t(d.specialization)}</p>
+                      </div>
+                      <button onClick={() => { setAlertsOpen(false); openReminderFor({ target: 'document', driverId: d.id, docKey: docs[0].key, title: t('Atnaujinti dokumentą'), repeat: 'weekly' }); }} title={t('Sukurti priminimą')} className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold text-ink bg-ink/[0.06] hover:bg-ink hover:text-white rounded-lg px-2 py-1.5 transition-all"><Bell size={12} /> {t('Priminti')}</button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {docs.map(x => (
+                        <span key={x.key} className={cn('inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5', x.days < 0 ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-700')}>
+                          {t(x.label)} · {x.iso} {x.days < 0 ? `(${t('pasibaigė')})` : `(${x.days} ${t('d.')})`}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
         </Modal>
       )}
 
@@ -3442,6 +3651,85 @@ function HomeDriverCard({ driver, canEdit, onSendToTrip }: { driver: Driver; can
   );
 }
 
+// Priminimo kūrimo / redagavimo forma. Galima pririšti vairuotoją, mašiną,
+// dokumentą arba laisvą priminimą; nustatyti datą ir kartojimo dažnį.
+function ReminderEditor({ drivers, cars, initial, onSave, onCancel }: {
+  drivers: Driver[]; cars: Car[]; initial: Partial<Reminder>;
+  onSave: (r: Partial<Reminder>) => void; onCancel: () => void;
+}) {
+  const t = useT();
+  const [target, setTarget]   = useState<ReminderTarget>(initial.target || 'custom');
+  const [driverId, setDriverId] = useState(initial.driverId || '');
+  const [carId, setCarId]     = useState(initial.carId || '');
+  const [docKey, setDocKey]   = useState(initial.docKey || DOC_FIELDS[0].key);
+  const [title, setTitle]     = useState(initial.title || '');
+  const [note, setNote]       = useState(initial.note || '');
+  const [dueDate, setDueDate] = useState(initial.dueDate || format(addDays(new Date(), 7), 'yyyy-MM-dd'));
+  const [repeat, setRepeat]   = useState<ReminderRepeat>(initial.repeat || 'weekly');
+  const sortedDrivers = [...drivers].filter(d => !d.dismissedDate).sort((a, b) => a.name.localeCompare(b.name, 'lt'));
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const titleFinal = title.trim() || (target === 'document' ? t('Atnaujinti dokumentą') : target === 'driver' ? t('Priminimas vairuotojui') : target === 'car' ? t('Priminimas mašinai') : t('Priminimas'));
+    onSave({
+      ...initial, target, title: titleFinal, note: note.trim() || undefined, dueDate, repeat,
+      driverId: (target === 'driver' || target === 'document') ? driverId : undefined,
+      carId: target === 'car' ? carId : undefined,
+      docKey: target === 'document' ? docKey : undefined,
+    });
+  };
+
+  return (
+    <form className="space-y-3.5" onSubmit={submit}>
+      <Field label={t('Tipas')}>
+        <select value={target} onChange={e => setTarget(e.target.value as ReminderTarget)} className={selectCls}>
+          <option value="custom">{t('Laisvas priminimas')}</option>
+          <option value="driver">{t('Vairuotojas')}</option>
+          <option value="car">{t('Mašina')}</option>
+          <option value="document">{t('Dokumentas')}</option>
+        </select>
+      </Field>
+      {(target === 'driver' || target === 'document') && (
+        <Field label={t('Vairuotojas')}>
+          <select value={driverId} onChange={e => setDriverId(e.target.value)} required className={selectCls}>
+            <option value="">{t('Pasirinkite...')}</option>
+            {sortedDrivers.map(d => <option key={d.id} value={d.id}>{d.name} ({d.companyType} • {t(d.specialization)})</option>)}
+          </select>
+        </Field>
+      )}
+      {target === 'document' && (
+        <Field label={t('Dokumentas')}>
+          <select value={docKey} onChange={e => setDocKey(e.target.value)} className={selectCls}>
+            {DOC_FIELDS.map(f => <option key={f.key} value={f.key}>{t(f.label)}</option>)}
+          </select>
+        </Field>
+      )}
+      {target === 'car' && (
+        <Field label={t('Mašina')}>
+          <select value={carId} onChange={e => setCarId(e.target.value)} required className={selectCls}>
+            <option value="">{t('Pasirinkite...')}</option>
+            {[...cars].sort((a, b) => a.number.localeCompare(b.number)).map(c => <option key={c.id} value={c.id}>{c.number} ({t(c.type)} • {c.registration})</option>)}
+          </select>
+        </Field>
+      )}
+      <Field label={t('Pavadinimas')}><input value={title} onChange={e => setTitle(e.target.value)} placeholder={t('pvz. Paklausti, kada atvyks į kadenciją')} className={inputCls} /></Field>
+      <Field label={t('Pastaba')}><input value={note} onChange={e => setNote(e.target.value)} placeholder={t('neprivaloma')} className={inputCls} /></Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label={t('Priminti')}><input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} required className={inputCls} /></Field>
+        <Field label={t('Kaip dažnai')}>
+          <select value={repeat} onChange={e => setRepeat(e.target.value as ReminderRepeat)} className={selectCls}>
+            {(Object.keys(REPEAT_LABELS) as ReminderRepeat[]).map(k => <option key={k} value={k}>{t(REPEAT_LABELS[k])}</option>)}
+          </select>
+        </Field>
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button type="submit" className="flex-1 inline-flex items-center justify-center gap-2 bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors"><Bell size={15} /> {t('Išsaugoti')}</button>
+        <button type="button" onClick={onCancel} className="px-4 bg-ink/[0.05] text-ink rounded-xl font-bold text-sm hover:bg-ink/10 transition-colors">{t('Atšaukti')}</button>
+      </div>
+    </form>
+  );
+}
+
 function PlanCard({ plan, canEdit = true, drivers, cars, plans, onComplete, onDelete, onEdit, editingPlanId, setEditingPlanId, setPlans }: {
   canEdit?: boolean;
   plan: ReplacementPlan; drivers: Driver[]; cars: Car[]; plans: ReplacementPlan[];
@@ -3751,12 +4039,19 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
               const d = driver, c = car;
 
               const isDropTarget = !!drag && !!c && drag.targetCar === c.number;
+              // Dokumentų galiojimo žymės (vairuotojams): ⚠ ties pasibaigimo diena šį mėnesį.
+              const docMarks = d ? docExpiries(d)
+                .filter(x => { const dt = parseISO(x.iso); return !isBefore(dt, monthStart) && !isAfter(dt, monthEnd); })
+                .map(x => ({ ...x, idx: differenceInDays(parseISO(x.iso), monthStart) })) : [];
+              // Ar koks dokumentas pasibaigs iki kadencijos (reiso/plano) pabaigos?
+              const tenureEnds = segs.filter(s => s.type === 'planned' || (s.type === 'active' && s.open)).map(s => s.to).filter(Boolean) as string[];
+              const needsReplace = !!d && tenureEnds.some(end => !!docExpiringBefore(d, end));
               return (
                 <div key={(d || c)!.id} data-car-number={c?.number} className={cn("flex group hover:bg-canvas/60 transition-colors h-16", isDropTarget && "bg-gold/15 ring-1 ring-inset ring-gold/50")}>
                   <div className="w-48 shrink-0 px-4 flex items-center gap-2.5 border-r border-hairline">
                     <div className={cn("w-2 h-2 rounded-full shrink-0", d ? (d.status === 'Reise' ? 'bg-blue-400' : 'bg-emerald-400') : 'bg-gold')} />
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold truncate">{d ? d.name : c!.number}</p>
+                      <p className="text-xs font-semibold truncate flex items-center gap-1">{d ? d.name : c!.number}{needsReplace && <span title={t('Dokumentas baigsis iki kadencijos pabaigos — reikia kito vairuotojo')}><AlertTriangle size={12} className="text-red-500 shrink-0" /></span>}</p>
                       <p className="text-[10px] text-muted truncate">{d ? (d.status === 'Reise' && d.currentCar !== 'Nėra' ? d.currentCar : 'Namuose') : `${c!.type} • ${c!.registration}`}</p>
                     </div>
                   </div>
@@ -3764,6 +4059,16 @@ function DriverTimeline({ drivers, cars, plans, carAssignments, month, showCars,
                     {/* dienų tinklelis */}
                     {days.map((day, i) => (
                       <div key={i} className={cn("absolute top-0 bottom-0 border-r border-hairline/60", isSameDay(day, new Date()) && "bg-gold/10")} style={{ left: pct(i), width: pct(1) }} />
+                    ))}
+
+                    {/* Dokumentų galiojimo pabaigos žymės (⚠ ties data) */}
+                    {docMarks.map(x => (
+                      <div key={x.key} className="absolute top-0 bottom-0 z-20 flex flex-col items-center pointer-events-none" style={{ left: pct(x.idx + 0.5), transform: 'translateX(-50%)' }}>
+                        <div className="absolute top-0 bottom-0 border-l border-dashed border-red-400/70" />
+                        <div className="pointer-events-auto mt-0.5" title={`${t(x.label)} ${t('baigiasi')} ${x.iso}${x.days < 0 ? ` (${t('pasibaigė')})` : ` (${x.days} ${t('d.')})`}`}>
+                          <AlertTriangle size={11} className={cn('drop-shadow', x.days < 0 ? 'text-red-600' : 'text-amber-500')} fill="currentColor" />
+                        </div>
+                      </div>
                     ))}
 
                     {/* segmentai: dabartinis (žiedas) · praeitis (blankesnis) · planuojama (punktyras) */}
