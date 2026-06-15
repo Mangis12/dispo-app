@@ -1910,8 +1910,8 @@ export default function App() {
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-ink flex items-center justify-center"><FileSpreadsheet size={17} className="text-gold-soft" /></div>
                 <div>
-                  <h2 className="text-base font-semibold tracking-tight">Importuoti vairuotojų sąrašą</h2>
-                  <p className="text-[11px] text-muted">Excel (.xlsx / .xls) arba .csv · duomenys atsinaujins sistemoje</p>
+                  <h2 className="text-base font-semibold tracking-tight">{t('Importuoti vairuotojų sąrašą')}</h2>
+                  <p className="text-[11px] text-muted">{t('Excel (.xlsx / .xls) arba .csv · duomenys atsinaujins sistemoje')}</p>
                 </div>
               </div>
               <button onClick={() => setImportOpen(false)} className="p-1.5 text-muted hover:text-ink hover:bg-stone-100 rounded-lg transition-colors"><X size={16} /></button>
@@ -1924,43 +1924,43 @@ export default function App() {
                     <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.currentTarget.value = ''; }} />
                     <div className="border-2 border-dashed border-hairline hover:border-gold/60 rounded-2xl p-10 text-center transition-colors bg-canvas">
                       <Upload size={28} className="mx-auto text-muted mb-3" />
-                      <p className="text-sm font-semibold text-ink">Pasirinkite Excel failą</p>
-                      <p className="text-xs text-muted mt-1">Stulpeliai atpažįstami automatiškai: Pavardė, Vardas, Tel, Paso galiojimo data, Teisių galiojimas, 95 kodo, Tacho kortelės, LLGL / Viza, ADR, Asmens kodas…</p>
+                      <p className="text-sm font-semibold text-ink">{t('Pasirinkite Excel failą')}</p>
+                      <p className="text-xs text-muted mt-1">{t('Stulpeliai atpažįstami automatiškai: Pavardė, Vardas, Tel, Paso galiojimo data, Teisių galiojimas, 95 kodo, Tacho kortelės, LLGL / Viza, ADR, Asmens kodas…')}</p>
                     </div>
                   </label>
                   {importErr && <p className="mt-4 text-xs font-medium text-red-600 bg-red-50 rounded-xl px-3 py-2.5">{importErr}</p>}
 
                   {/* Pavyzdiniai šablonai — LT ir PL įmonių dokumentai skiriasi */}
                   <div className="mt-4 rounded-2xl border border-hairline bg-canvas p-4">
-                    <p className="text-xs font-semibold text-ink mb-0.5">Nežinote formato? Atsisiųskite pavyzdį</p>
-                    <p className="text-[11px] text-muted mb-3">LT ir PL įmonių dokumentai skiriasi: <b>LT — LLGL</b>, <b>PL — Viza</b>; abiem — ADR. Užpildykite šabloną ir įkelkite.</p>
+                    <p className="text-xs font-semibold text-ink mb-0.5">{t('Nežinote formato? Atsisiųskite pavyzdį')}</p>
+                    <p className="text-[11px] text-muted mb-3">{t('LT ir PL įmonių dokumentai skiriasi: LT — LLGL, PL — Viza; abiem — ADR. Užpildykite šabloną ir įkelkite.')}</p>
                     <div className="flex flex-wrap gap-2">
-                      <button onClick={() => downloadTemplate('LT')} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-hairline bg-surface text-xs font-semibold text-ink hover:border-ink/40 hover:bg-ink hover:text-white transition-all"><Download size={13} /> LT įmonės šablonas</button>
-                      <button onClick={() => downloadTemplate('PL')} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-hairline bg-surface text-xs font-semibold text-ink hover:border-ink/40 hover:bg-ink hover:text-white transition-all"><Download size={13} /> PL įmonės šablonas</button>
+                      <button onClick={() => downloadTemplate('LT')} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-hairline bg-surface text-xs font-semibold text-ink hover:border-ink/40 hover:bg-ink hover:text-white transition-all"><Download size={13} /> {t('LT įmonės šablonas')}</button>
+                      <button onClick={() => downloadTemplate('PL')} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-hairline bg-surface text-xs font-semibold text-ink hover:border-ink/40 hover:bg-ink hover:text-white transition-all"><Download size={13} /> {t('PL įmonės šablonas')}</button>
                     </div>
                   </div>
                   <div className="mt-4 flex items-start gap-2 text-[11px] text-muted bg-gold/5 border border-gold/20 rounded-xl px-3 py-2.5">
                     <ShieldCheck size={14} className="text-gold shrink-0 mt-0.5" />
-                    <span>Atitikimas pagal <b>Asmens kodą</b> (jei nėra — DS numerį, tada vardą+pavardę). Esami vairuotojai <b>atnaujinami</b>, nauji — <b>pridedami</b>. Reiso būsenos ir istorija nekeičiamos.</span>
+                    <span>{t('Atitikimas pagal Asmens kodą (jei nėra — DS numerį, tada vardą+pavardę). Esami vairuotojai atnaujinami, nauji — pridedami. Reiso būsenos ir istorija nekeičiamos.')}</span>
                   </div>
                 </>
               ) : (
                 <>
                   <div className="flex flex-wrap items-center gap-2 mb-4">
-                    <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg">+{importDiff.created} nauji</span>
-                    <span className="text-xs font-semibold bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg">{importDiff.updated} atnaujinami</span>
-                    <span className="text-xs text-muted ml-1">{importMeta?.fileName} · {importRows.length} eilutės</span>
-                    <button onClick={() => { setImportRows([]); setImportMeta(null); }} className="ml-auto text-xs text-muted hover:text-ink underline">Kitas failas</button>
+                    <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg">+{importDiff.created} {t('nauji')}</span>
+                    <span className="text-xs font-semibold bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg">{importDiff.updated} {t('atnaujinami')}</span>
+                    <span className="text-xs text-muted ml-1">{importMeta?.fileName} · {importRows.length} {t('eilutės')}</span>
+                    <button onClick={() => { setImportRows([]); setImportMeta(null); }} className="ml-auto text-xs text-muted hover:text-ink underline">{t('Kitas failas')}</button>
                   </div>
                   <div className="rounded-xl border border-hairline overflow-hidden overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead><tr className="bg-ink text-white text-left">
-                        <th className="px-3 py-2 font-bold">Vairuotojas</th>
-                        <th className="px-3 py-2 font-bold">Įmonė/Tipas</th>
-                        <th className="px-3 py-2 font-bold">Pasas</th>
-                        <th className="px-3 py-2 font-bold">Teisės</th>
+                        <th className="px-3 py-2 font-bold">{t('Vairuotojas')}</th>
+                        <th className="px-3 py-2 font-bold">{t('Įmonė/Tipas')}</th>
+                        <th className="px-3 py-2 font-bold">{t('Pasas')}</th>
+                        <th className="px-3 py-2 font-bold">{t('Teisės')}</th>
                         <th className="px-3 py-2 font-bold">95 k.</th>
-                        <th className="px-3 py-2 font-bold">Tacho</th>
+                        <th className="px-3 py-2 font-bold">{t('Tacho')}</th>
                         <th className="px-3 py-2 font-bold">ADR</th>
                         <th className="px-3 py-2 font-bold">LLGL/Viza</th>
                       </tr></thead>
@@ -1986,15 +1986,15 @@ export default function App() {
                       </tbody>
                     </table>
                   </div>
-                  {importRows.length > 60 && <p className="text-[11px] text-muted mt-2">Rodoma 60 iš {importRows.length}. Importuojami visi.</p>}
+                  {importRows.length > 60 && <p className="text-[11px] text-muted mt-2">{t('Rodoma 60 iš')} {importRows.length}. {t('Importuojami visi.')}</p>}
                 </>
               )}
             </div>
 
             {importRows.length > 0 && (
               <div className="px-6 py-4 border-t border-hairline flex items-center justify-end gap-2 shrink-0">
-                <button onClick={() => setImportOpen(false)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-muted hover:text-ink hover:bg-stone-100 transition-colors">Atšaukti</button>
-                <button onClick={applyImport} className="inline-flex items-center gap-2 bg-ink text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-ink/85 transition-all"><FileCheck2 size={15} /> Importuoti į sistemą</button>
+                <button onClick={() => setImportOpen(false)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-muted hover:text-ink hover:bg-stone-100 transition-colors">{t('Atšaukti')}</button>
+                <button onClick={applyImport} className="inline-flex items-center gap-2 bg-ink text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-ink/85 transition-all"><FileCheck2 size={15} /> {t('Importuoti į sistemą')}</button>
               </div>
             )}
           </div>
@@ -2009,8 +2009,8 @@ export default function App() {
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-ink flex items-center justify-center"><FileSpreadsheet size={17} className="text-gold-soft" /></div>
                 <div>
-                  <h2 className="text-base font-semibold tracking-tight">Importuoti automobilių sąrašą</h2>
-                  <p className="text-[11px] text-muted">Excel (.xlsx / .xls) arba .csv · duomenys atsinaujins sistemoje</p>
+                  <h2 className="text-base font-semibold tracking-tight">{t('Importuoti automobilių sąrašą')}</h2>
+                  <p className="text-[11px] text-muted">{t('Excel (.xlsx / .xls) arba .csv · duomenys atsinaujins sistemoje')}</p>
                 </div>
               </div>
               <button onClick={() => setCarImportOpen(false)} className="p-1.5 text-muted hover:text-ink hover:bg-stone-100 rounded-lg transition-colors"><X size={16} /></button>
@@ -2023,45 +2023,45 @@ export default function App() {
                     <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleCarImportFile(f); e.currentTarget.value = ''; }} />
                     <div className="border-2 border-dashed border-hairline hover:border-gold/60 rounded-2xl p-10 text-center transition-colors bg-canvas">
                       <Upload size={28} className="mx-auto text-muted mb-3" />
-                      <p className="text-sm font-semibold text-ink">Pasirinkite Excel failą</p>
-                      <p className="text-xs text-muted mt-1">Stulpeliai atpažįstami automatiškai: Mašinos nr, Markė, Ref/Tent, Gamybos metai, Registracija.</p>
+                      <p className="text-sm font-semibold text-ink">{t('Pasirinkite Excel failą')}</p>
+                      <p className="text-xs text-muted mt-1">{t('Stulpeliai atpažįstami automatiškai: Mašinos nr, Markė, Ref/Tent, Gamybos metai, Registracija.')}</p>
                     </div>
                   </label>
                   {carImportErr && <p className="mt-4 text-xs font-medium text-red-600 bg-red-50 rounded-xl px-3 py-2.5">{carImportErr}</p>}
 
                   <div className="mt-4 rounded-2xl border border-hairline bg-canvas p-4">
-                    <p className="text-xs font-semibold text-ink mb-0.5">Nežinote formato? Atsisiųskite pavyzdį</p>
-                    <p className="text-[11px] text-muted mb-3">Užpildykite šabloną (Mašinos nr · Markė · Ref/Tent · Gamybos metai) ir įkelkite atgal.</p>
-                    <button onClick={downloadCarTemplate} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-hairline bg-surface text-xs font-semibold text-ink hover:border-ink/40 hover:bg-ink hover:text-white transition-all"><Download size={13} /> Automobilių šablonas</button>
+                    <p className="text-xs font-semibold text-ink mb-0.5">{t('Nežinote formato? Atsisiųskite pavyzdį.')}</p>
+                    <p className="text-[11px] text-muted mb-3">{t('Užpildykite šabloną (Mašinos nr · Markė · Ref/Tent · Gamybos metai) ir įkelkite atgal.')}</p>
+                    <button onClick={downloadCarTemplate} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-hairline bg-surface text-xs font-semibold text-ink hover:border-ink/40 hover:bg-ink hover:text-white transition-all"><Download size={13} /> {t('Automobilių šablonas')}</button>
                   </div>
                   <div className="mt-4 flex items-start gap-2 text-[11px] text-muted bg-gold/5 border border-gold/20 rounded-xl px-3 py-2.5">
                     <ShieldCheck size={14} className="text-gold shrink-0 mt-0.5" />
-                    <span>Atitikimas pagal <b>Mašinos nr</b>. Esami automobiliai <b>atnaujinami</b>, nauji — <b>pridedami</b> (būsena „Aktyvus"). Vairuotojų priskyrimai nekeičiami.</span>
+                    <span>{t('Atitikimas pagal Mašinos nr. Esami automobiliai atnaujinami, nauji — pridedami (būsena „Aktyvus"). Vairuotojų priskyrimai nekeičiami.')}</span>
                   </div>
                 </>
               ) : (
                 <>
                   <div className="flex flex-wrap items-center gap-2 mb-4">
-                    <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg">+{carImportDiff.created} nauji</span>
-                    <span className="text-xs font-semibold bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg">{carImportDiff.updated} atnaujinami</span>
-                    <span className="text-xs text-muted ml-1">{carImportMeta?.fileName} · {carImportRows.length} eilutės</span>
-                    <button onClick={() => { setCarImportRows([]); setCarImportMeta(null); }} className="ml-auto text-xs text-muted hover:text-ink underline">Kitas failas</button>
+                    <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg">+{carImportDiff.created} {t('nauji')}</span>
+                    <span className="text-xs font-semibold bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg">{carImportDiff.updated} {t('atnaujinami')}</span>
+                    <span className="text-xs text-muted ml-1">{carImportMeta?.fileName} · {carImportRows.length} {t('eilutės')}</span>
+                    <button onClick={() => { setCarImportRows([]); setCarImportMeta(null); }} className="ml-auto text-xs text-muted hover:text-ink underline">{t('Kitas failas')}</button>
                   </div>
                   <div className="rounded-xl border border-hairline overflow-hidden overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead><tr className="bg-ink text-white text-left">
-                        <th className="px-3 py-2 font-bold">Mašinos nr</th>
-                        <th className="px-3 py-2 font-bold">Markė</th>
-                        <th className="px-3 py-2 font-bold">Tipas</th>
-                        <th className="px-3 py-2 font-bold">Metai</th>
-                        <th className="px-3 py-2 font-bold">Reg.</th>
+                        <th className="px-3 py-2 font-bold">{t('Mašinos nr')}</th>
+                        <th className="px-3 py-2 font-bold">{t('Markė')}</th>
+                        <th className="px-3 py-2 font-bold">{t('Tipas')}</th>
+                        <th className="px-3 py-2 font-bold">{t('Metai')}</th>
+                        <th className="px-3 py-2 font-bold">{t('Reg.')}</th>
                       </tr></thead>
                       <tbody>
                         {carImportRows.slice(0, 80).map((p, i) => (
                           <tr key={i} className="border-t border-hairline odd:bg-canvas/40">
                             <td className="px-3 py-2 font-mono font-semibold text-ink">{p.number}</td>
                             <td className="px-3 py-2">{p.brand || '—'}</td>
-                            <td className="px-3 py-2">{p.type}</td>
+                            <td className="px-3 py-2">{t(p.type)}</td>
                             <td className="px-3 py-2 font-mono">{p.year || '—'}</td>
                             <td className="px-3 py-2">{p.registration}</td>
                           </tr>
@@ -2069,15 +2069,15 @@ export default function App() {
                       </tbody>
                     </table>
                   </div>
-                  {carImportRows.length > 80 && <p className="text-[11px] text-muted mt-2">Rodoma 80 iš {carImportRows.length}. Importuojami visi.</p>}
+                  {carImportRows.length > 80 && <p className="text-[11px] text-muted mt-2">{t('Rodoma 80 iš')} {carImportRows.length}. {t('Importuojami visi.')}</p>}
                 </>
               )}
             </div>
 
             {carImportRows.length > 0 && (
               <div className="px-6 py-4 border-t border-hairline flex items-center justify-end gap-2 shrink-0">
-                <button onClick={() => setCarImportOpen(false)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-muted hover:text-ink hover:bg-stone-100 transition-colors">Atšaukti</button>
-                <button onClick={applyCarImport} className="inline-flex items-center gap-2 bg-ink text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-ink/85 transition-all"><FileCheck2 size={15} /> Importuoti į sistemą</button>
+                <button onClick={() => setCarImportOpen(false)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-muted hover:text-ink hover:bg-stone-100 transition-colors">{t('Atšaukti')}</button>
+                <button onClick={applyCarImport} className="inline-flex items-center gap-2 bg-ink text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-ink/85 transition-all"><FileCheck2 size={15} /> {t('Importuoti į sistemą')}</button>
               </div>
             )}
           </div>
@@ -2085,100 +2085,100 @@ export default function App() {
       )}
 
       {addDriverOpen && (
-        <Modal title="Naujas vairuotojas" onClose={() => setAddDriverOpen(false)}>
+        <Modal title={t('Naujas vairuotojas')} onClose={() => setAddDriverOpen(false)}>
           <form className="space-y-4" onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); addDriver({ name: f.get('name') as string, phone: f.get('phone') as string, status: 'Namuose', currentCar: 'Nėra', startDate: null, plannedReturnDate: null, homeStatus: 'Poilsis', readinessDate: format(new Date(), 'yyyy-MM-dd'), companyType: f.get('companyType') as RegistrationType, specialization: f.get('specialization') as DriverSpecialization }); }}>
-            <Field label="Vardas Pavardė"><input name="name" required placeholder="Vardas Pavardė" className={inputCls} /></Field>
-            <Field label="Telefonas"><input name="phone" required placeholder="+370 ..." className={inputCls} /></Field>
+            <Field label={t('Vardas Pavardė')}><input name="name" required placeholder={t('Vardas Pavardė')} className={inputCls} /></Field>
+            <Field label={t('Telefonas')}><input name="phone" required placeholder="+370 ..." className={inputCls} /></Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Įmonė"><select name="companyType" required className={selectCls}><option value="LT">LT</option><option value="PL">PL</option></select></Field>
-              <Field label="Tipas"><select name="specialization" required className={selectCls}><option value="Tentas">Tentas</option><option value="Refas">Refas</option><option value="Universalus">Universalus</option></select></Field>
+              <Field label={t('Įmonė')}><select name="companyType" required className={selectCls}><option value="LT">LT</option><option value="PL">PL</option></select></Field>
+              <Field label={t('Tipas')}><select name="specialization" required className={selectCls}><option value="Tentas">{t('Tentas')}</option><option value="Refas">{t('Refas')}</option><option value="Universalus">{t('Universalus')}</option></select></Field>
             </div>
-            <button type="submit" className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors">Pridėti</button>
+            <button type="submit" className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors">{t('Pridėti')}</button>
           </form>
         </Modal>
       )}
 
       {/* Add Car */}
       {addCarOpen && (
-        <Modal title="Naujas automobilis" onClose={() => setAddCarOpen(false)}>
+        <Modal title={t('Naujas automobilis')} onClose={() => setAddCarOpen(false)}>
           <form className="space-y-4" onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); addCar({ number: (f.get('number') as string).toUpperCase(), status: 'Aktyvus', type: f.get('type') as CarType, registration: f.get('registration') as RegistrationType, activeFrom: f.get('activeFrom') as string }); }}>
-            <Field label="Numeris"><input name="number" required placeholder="ABC 123" className={cn(inputCls, 'uppercase font-mono')} /></Field>
+            <Field label={t('Numeris')}><input name="number" required placeholder="ABC 123" className={cn(inputCls, 'uppercase font-mono')} /></Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Registracija"><select name="registration" required className={selectCls}><option value="LT">LT</option><option value="PL">PL</option></select></Field>
-              <Field label="Tipas"><select name="type" required className={selectCls}><option value="Tentas">Tentas</option><option value="Refas">Refas</option></select></Field>
+              <Field label={t('Registracija')}><select name="registration" required className={selectCls}><option value="LT">LT</option><option value="PL">PL</option></select></Field>
+              <Field label={t('Tipas')}><select name="type" required className={selectCls}><option value="Tentas">{t('Tentas')}</option><option value="Refas">{t('Refas')}</option></select></Field>
             </div>
-            <Field label="Aktyvus nuo"><input name="activeFrom" type="date" required defaultValue={format(new Date(), 'yyyy-MM-dd')} className={inputCls} /></Field>
-            <button type="submit" className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors">Pridėti</button>
+            <Field label={t('Aktyvus nuo')}><input name="activeFrom" type="date" required defaultValue={format(new Date(), 'yyyy-MM-dd')} className={inputCls} /></Field>
+            <button type="submit" className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors">{t('Pridėti')}</button>
           </form>
         </Modal>
       )}
 
       {/* Edit Car */}
       {editCarOpen && selectedCarForEdit && (
-        <Modal title={`Redaguoti: ${selectedCarForEdit.number}`} onClose={() => { setEditCarOpen(false); setSelectedCarForEdit(null); }}>
+        <Modal title={`${t('Redaguoti')}: ${selectedCarForEdit.number}`} onClose={() => { setEditCarOpen(false); setSelectedCarForEdit(null); }}>
           <form className="space-y-4" onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); updateCar(selectedCarForEdit.id, { number: f.get('number') as string, type: f.get('type') as CarType, registration: f.get('registration') as RegistrationType, status: f.get('status') as 'Aktyvus' | 'Remontas' }); }}>
-            <Field label="Numeris"><input name="number" required defaultValue={selectedCarForEdit.number} className={cn(inputCls, 'uppercase')} /></Field>
+            <Field label={t('Numeris')}><input name="number" required defaultValue={selectedCarForEdit.number} className={cn(inputCls, 'uppercase')} /></Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Registracija"><select name="registration" required defaultValue={selectedCarForEdit.registration} className={selectCls}><option value="LT">LT</option><option value="PL">PL</option></select></Field>
-              <Field label="Tipas"><select name="type" required defaultValue={selectedCarForEdit.type} className={selectCls}><option value="Tentas">Tentas</option><option value="Refas">Refas</option></select></Field>
+              <Field label={t('Registracija')}><select name="registration" required defaultValue={selectedCarForEdit.registration} className={selectCls}><option value="LT">LT</option><option value="PL">PL</option></select></Field>
+              <Field label={t('Tipas')}><select name="type" required defaultValue={selectedCarForEdit.type} className={selectCls}><option value="Tentas">{t('Tentas')}</option><option value="Refas">{t('Refas')}</option></select></Field>
             </div>
-            <Field label="Būsena"><select name="status" defaultValue={selectedCarForEdit.status} className={selectCls}><option value="Aktyvus">Aktyvus</option><option value="Remontas">Remontas</option></select></Field>
-            <button type="submit" className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors">Išsaugoti</button>
+            <Field label={t('Būsena')}><select name="status" defaultValue={selectedCarForEdit.status} className={selectCls}><option value="Aktyvus">{t('Aktyvus')}</option><option value="Remontas">{t('Remontas')}</option></select></Field>
+            <button type="submit" className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors">{t('Išsaugoti')}</button>
           </form>
         </Modal>
       )}
 
       {/* Send to Trip */}
       {tripOpen && (selectedDriverForTrip || selectedCarForAssignment) && (
-        <Modal title={selectedDriverForTrip ? `Į reisą: ${selectedDriverForTrip.name}` : `Priskirti: ${selectedCarForAssignment}`} onClose={() => { setTripOpen(false); setSelectedDriverForTrip(null); setSelectedCarForAssignment(null); }}>
+        <Modal title={selectedDriverForTrip ? `${t('Į reisą')}: ${selectedDriverForTrip.name}` : `${t('Priskirti')}: ${selectedCarForAssignment}`} onClose={() => { setTripOpen(false); setSelectedDriverForTrip(null); setSelectedCarForAssignment(null); }}>
           <form className="space-y-4" onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); const did = selectedDriverForTrip?.id || f.get('driverId') as string; const car = selectedCarForAssignment || f.get('car') as string; sendToTrip(did, car, f.get('startDate') as string, f.get('returnDate') as string); }}>
-            {!selectedDriverForTrip && <Field label="Vairuotojas"><select name="driverId" required className={selectCls}><option value="">Pasirinkite...</option>{drivers.filter(d => d.status === 'Namuose').map(d => <option key={d.id} value={d.id}>{d.name} ({d.companyType} • {d.specialization})</option>)}</select></Field>}
-            {!selectedCarForAssignment && <Field label="Automobilis"><select name="car" required className={selectCls}>{cars.map(c => <option key={c.id} value={c.number}>{c.number} ({c.registration} • {c.type})</option>)}</select></Field>}
+            {!selectedDriverForTrip && <Field label={t('Vairuotojas')}><select name="driverId" required className={selectCls}><option value="">{t('Pasirinkite...')}</option>{drivers.filter(d => d.status === 'Namuose').map(d => <option key={d.id} value={d.id}>{d.name} ({d.companyType} • {t(d.specialization)})</option>)}</select></Field>}
+            {!selectedCarForAssignment && <Field label={t('Automobilis')}><select name="car" required className={selectCls}>{cars.map(c => <option key={c.id} value={c.number}>{c.number} ({c.registration} • {t(c.type)})</option>)}</select></Field>}
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Pradžia"><input name="startDate" type="date" required defaultValue={format(new Date(), 'yyyy-MM-dd')} className={inputCls} /></Field>
-              <Field label="Planuojama pabaiga"><input name="returnDate" type="date" required defaultValue={format(addDays(new Date(), 42), 'yyyy-MM-dd')} className={inputCls} /></Field>
+              <Field label={t('Pradžia')}><input name="startDate" type="date" required defaultValue={format(new Date(), 'yyyy-MM-dd')} className={inputCls} /></Field>
+              <Field label={t('Planuojama pabaiga')}><input name="returnDate" type="date" required defaultValue={format(addDays(new Date(), 42), 'yyyy-MM-dd')} className={inputCls} /></Field>
             </div>
-            <button type="submit" className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors">Patvirtinti</button>
+            <button type="submit" className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors">{t('Patvirtinti')}</button>
           </form>
         </Modal>
       )}
 
       {/* Send Home */}
       {homeOpen && selectedDriverForHome && (
-        <Modal title={`Namo: ${selectedDriverForHome.name}`} onClose={() => { setHomeOpen(false); setSelectedDriverForHome(null); }}>
+        <Modal title={`${t('Namo')}: ${selectedDriverForHome.name}`} onClose={() => { setHomeOpen(false); setSelectedDriverForHome(null); }}>
           <form className="space-y-4" onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); sendHome(selectedDriverForHome.id, f.get('status') as HomeStatus, f.get('readinessDate') as string); }}>
-            <Field label="Būsena namuose"><select name="status" required className={selectCls}><option value="Poilsis">Poilsis</option><option value="Tvarko dokumentus">Tvarko dokumentus</option></select></Field>
-            <Field label="Gali nuo"><input name="readinessDate" type="date" required defaultValue={format(addDays(new Date(), 14), 'yyyy-MM-dd')} className={inputCls} /></Field>
-            <button type="submit" className="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors">Patvirtinti</button>
+            <Field label={t('Būsena namuose')}><select name="status" required className={selectCls}><option value="Poilsis">{t('Poilsis')}</option><option value="Tvarko dokumentus">{t('Tvarko dokumentus')}</option></select></Field>
+            <Field label={t('Gali nuo')}><input name="readinessDate" type="date" required defaultValue={format(addDays(new Date(), 14), 'yyyy-MM-dd')} className={inputCls} /></Field>
+            <button type="submit" className="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors">{t('Patvirtinti')}</button>
           </form>
         </Modal>
       )}
 
       {/* Edit Driver */}
       {editDriverOpen && selectedDriverForEdit && (
-        <Modal title={`Redaguoti: ${selectedDriverForEdit.name}`} onClose={() => { setEditDriverOpen(false); setSelectedDriverForEdit(null); }}>
-          <form className="space-y-4" onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); updateDriver(selectedDriverForEdit.id, { name: f.get('name') as string, phone: f.get('phone') as string, status: f.get('status') as DriverStatus, currentCar: f.get('car') as string, startDate: (f.get('startDate') as string) || null, plannedReturnDate: (f.get('returnDate') as string) || null, homeStatus: f.get('homeStatus') as HomeStatus, readinessDate: (f.get('readinessDate') as string) || null, companyType: f.get('companyType') as RegistrationType, specialization: f.get('specialization') as DriverSpecialization }); setEditDriverOpen(false); showToast('Duomenys atnaujinti'); }}>
+        <Modal title={`${t('Redaguoti')}: ${selectedDriverForEdit.name}`} onClose={() => { setEditDriverOpen(false); setSelectedDriverForEdit(null); }}>
+          <form className="space-y-4" onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); updateDriver(selectedDriverForEdit.id, { name: f.get('name') as string, phone: f.get('phone') as string, status: f.get('status') as DriverStatus, currentCar: f.get('car') as string, startDate: (f.get('startDate') as string) || null, plannedReturnDate: (f.get('returnDate') as string) || null, homeStatus: f.get('homeStatus') as HomeStatus, readinessDate: (f.get('readinessDate') as string) || null, companyType: f.get('companyType') as RegistrationType, specialization: f.get('specialization') as DriverSpecialization }); setEditDriverOpen(false); showToast(t('Duomenys atnaujinti')); }}>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Vardas"><input name="name" required defaultValue={selectedDriverForEdit.name} className={inputCls} /></Field>
-              <Field label="Tel."><input name="phone" required defaultValue={selectedDriverForEdit.phone} className={inputCls} /></Field>
+              <Field label={t('Vardas')}><input name="name" required defaultValue={selectedDriverForEdit.name} className={inputCls} /></Field>
+              <Field label={t('Tel.')}><input name="phone" required defaultValue={selectedDriverForEdit.phone} className={inputCls} /></Field>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Įmonė"><select name="companyType" required defaultValue={selectedDriverForEdit.companyType} className={selectCls}><option value="LT">LT</option><option value="PL">PL</option></select></Field>
-              <Field label="Tipas"><select name="specialization" required defaultValue={selectedDriverForEdit.specialization} className={selectCls}><option value="Tentas">Tentas</option><option value="Refas">Refas</option><option value="Universalus">Universalus</option></select></Field>
+              <Field label={t('Įmonė')}><select name="companyType" required defaultValue={selectedDriverForEdit.companyType} className={selectCls}><option value="LT">LT</option><option value="PL">PL</option></select></Field>
+              <Field label={t('Tipas')}><select name="specialization" required defaultValue={selectedDriverForEdit.specialization} className={selectCls}><option value="Tentas">{t('Tentas')}</option><option value="Refas">{t('Refas')}</option><option value="Universalus">{t('Universalus')}</option></select></Field>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Būsena"><select name="status" defaultValue={selectedDriverForEdit.status} className={selectCls}><option value="Reise">Reise</option><option value="Namuose">Namuose</option></select></Field>
-              <Field label="Auto"><input name="car" defaultValue={selectedDriverForEdit.currentCar} className={inputCls} /></Field>
+              <Field label={t('Būsena')}><select name="status" defaultValue={selectedDriverForEdit.status} className={selectCls}><option value="Reise">{t('Reise')}</option><option value="Namuose">{t('Namuose')}</option></select></Field>
+              <Field label={t('Auto')}><input name="car" defaultValue={selectedDriverForEdit.currentCar} className={inputCls} /></Field>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Pradžia"><input name="startDate" type="date" defaultValue={selectedDriverForEdit.startDate || ''} className={inputCls} /></Field>
-              <Field label="Grįžta"><input name="returnDate" type="date" defaultValue={selectedDriverForEdit.plannedReturnDate || ''} className={inputCls} /></Field>
+              <Field label={t('Pradžia')}><input name="startDate" type="date" defaultValue={selectedDriverForEdit.startDate || ''} className={inputCls} /></Field>
+              <Field label={t('Grįžta')}><input name="returnDate" type="date" defaultValue={selectedDriverForEdit.plannedReturnDate || ''} className={inputCls} /></Field>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Namų būsena"><select name="homeStatus" defaultValue={selectedDriverForEdit.homeStatus} className={selectCls}><option value="Nėra">Nėra</option><option value="Poilsis">Poilsis</option><option value="Tvarko dokumentus">Tvarko dokumentus</option></select></Field>
-              <Field label="Gali nuo"><input name="readinessDate" type="date" defaultValue={selectedDriverForEdit.readinessDate || ''} className={inputCls} /></Field>
+              <Field label={t('Namų būsena')}><select name="homeStatus" defaultValue={selectedDriverForEdit.homeStatus} className={selectCls}><option value="Nėra">{t('Nėra')}</option><option value="Poilsis">{t('Poilsis')}</option><option value="Tvarko dokumentus">{t('Tvarko dokumentus')}</option></select></Field>
+              <Field label={t('Gali nuo')}><input name="readinessDate" type="date" defaultValue={selectedDriverForEdit.readinessDate || ''} className={inputCls} /></Field>
             </div>
-            <button type="submit" className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors">Išsaugoti</button>
+            <button type="submit" className="w-full bg-ink text-white py-2.5 rounded-xl font-bold text-sm hover:bg-ink/90 transition-colors">{t('Išsaugoti')}</button>
           </form>
         </Modal>
       )}
@@ -2478,6 +2478,7 @@ function DriverProfileDrawer({ driver, plans, carAssignments, history, onClose, 
   driver: Driver; plans: ReplacementPlan[]; carAssignments: CarAssignment[]; history: HistoryEntry[];
   onClose: () => void; onTrip: (d: Driver) => void; onHome: (d: Driver) => void; onEdit: (d: Driver) => void;
 }) {
+  const t = useT();
   const d = driver;
   const initials = d.name.split(' ').map(w => w[0]).slice(0, 2).join('');
   const relPlans = plans.filter(p => p.leavingDriverId === d.id || p.incomingDriverId === d.id).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
@@ -2516,33 +2517,33 @@ function DriverProfileDrawer({ driver, plans, carAssignments, history, onClose, 
             <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg"><X size={18} /></button>
           </div>
           <div className="flex items-center gap-2 mt-4">
-            <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", d.status === 'Reise' ? "bg-blue-400/20 text-blue-100" : "bg-emerald-400/20 text-emerald-100")}><span className={cn("w-1.5 h-1.5 rounded-full", d.status === 'Reise' ? "bg-blue-300" : "bg-emerald-300")} />{d.status}</span>
+            <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", d.status === 'Reise' ? "bg-blue-400/20 text-blue-100" : "bg-emerald-400/20 text-emerald-100")}><span className={cn("w-1.5 h-1.5 rounded-full", d.status === 'Reise' ? "bg-blue-300" : "bg-emerald-300")} />{t(d.status)}</span>
             <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium">{d.companyType}</span>
-            <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium">{d.specialization}</span>
-            {isLate && <span className="rounded-full bg-red-500/25 text-red-100 px-2.5 py-1 text-xs font-semibold">Vėluoja</span>}
+            <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium">{t(d.specialization)}</span>
+            {isLate && <span className="rounded-full bg-red-500/25 text-red-100 px-2.5 py-1 text-xs font-semibold">{t('Vėluoja')}</span>}
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Būsenos santrauka */}
           <div className="bg-surface rounded-2xl border border-hairline p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">Būsena</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">{t('Būsena')}</p>
             {d.status === 'Reise' ? (<>
-              <Row k="Dabartinė mašina" v={<span className="font-mono">{d.currentCar}</span>} />
-              <Row k="Reiso pradžia" v={d.startDate || '—'} />
-              <Row k="Numatomas grįžimas" v={<span className={isLate ? 'text-red-500' : ''}>{d.plannedReturnDate || '—'}</span>} />
+              <Row k={t('Dabartinė mašina')} v={<span className="font-mono">{d.currentCar}</span>} />
+              <Row k={t('Reiso pradžia')} v={d.startDate || '—'} />
+              <Row k={t('Numatomas grįžimas')} v={<span className={isLate ? 'text-red-500' : ''}>{d.plannedReturnDate || '—'}</span>} />
             </>) : (<>
-              <Row k="Namų būsena" v={d.homeStatus} />
-              <Row k="Laisvas nuo" v={d.readinessDate || '—'} />
-              <Row k="Paskutinio reiso pabaiga" v={d.lastTripEndDate || '—'} />
+              <Row k={t('Namų būsena')} v={t(d.homeStatus)} />
+              <Row k={t('Laisvas nuo')} v={d.readinessDate || '—'} />
+              <Row k={t('Paskutinio reiso pabaiga')} v={d.lastTripEndDate || '—'} />
             </>)}
           </div>
 
           {/* Greiti veiksmai */}
           <div className="flex gap-2">
             {d.status === 'Reise'
-              ? <button onClick={() => onHome(d)} className="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-600 transition-colors"><LogOut size={15} /> Siųsti namo</button>
-              : <button onClick={() => onTrip(d)} className="flex-1 inline-flex items-center justify-center gap-2 bg-ink text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-ink/85 transition-colors"><LogIn size={15} /> Siųsti į reisą</button>}
+              ? <button onClick={() => onHome(d)} className="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-600 transition-colors"><LogOut size={15} /> {t('Siųsti namo')}</button>
+              : <button onClick={() => onTrip(d)} className="flex-1 inline-flex items-center justify-center gap-2 bg-ink text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-ink/85 transition-colors"><LogIn size={15} /> {t('Siųsti į reisą')}</button>}
             <button onClick={() => onEdit(d)} className="inline-flex items-center justify-center gap-2 px-4 bg-ink/[0.05] text-ink rounded-xl text-sm font-semibold hover:bg-ink hover:text-white transition-all"><Edit size={15} /></button>
           </div>
 
@@ -2556,20 +2557,20 @@ function DriverProfileDrawer({ driver, plans, carAssignments, history, onClose, 
             return (
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Dokumentai</p>
-                  {expired > 0 ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full"><ShieldAlert size={11} />{expired} pasibaigę</span>
-                    : soon > 0 ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full"><ShieldAlert size={11} />{soon} baigiasi</span>
-                    : items.length > 0 ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full"><ShieldCheck size={11} />Galioja</span> : null}
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">{t('Dokumentai')}</p>
+                  {expired > 0 ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full"><ShieldAlert size={11} />{expired} {t('pasibaigę')}</span>
+                    : soon > 0 ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full"><ShieldAlert size={11} />{soon} {t('baigiasi')}</span>
+                    : items.length > 0 ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full"><ShieldCheck size={11} />{t('Galioja')}</span> : null}
                 </div>
 
                 {/* Tapatybės info */}
                 {(docs.personalCode || docs.passportNo || docs.tachoCountry || d.email || d.tabNr) && (
                   <div className="bg-surface rounded-2xl border border-hairline p-3 mb-2 grid grid-cols-2 gap-x-4 gap-y-1.5">
-                    {docs.personalCode && <div><p className="text-[10px] text-muted">Asmens kodas</p><p className="text-xs font-mono font-medium">{docs.personalCode}</p></div>}
-                    {docs.passportNo && <div><p className="text-[10px] text-muted">Paso NR.</p><p className="text-xs font-mono font-medium">{docs.passportNo}</p></div>}
-                    {docs.tachoCountry && <div><p className="text-[10px] text-muted">Tacho šalis</p><p className="text-xs font-medium">{docs.tachoCountry}</p></div>}
-                    {d.tabNr && <div><p className="text-[10px] text-muted">DS Nr.</p><p className="text-xs font-mono font-medium">{d.tabNr}</p></div>}
-                    {d.email && <div className="col-span-2 min-w-0"><p className="text-[10px] text-muted">El. paštas</p><a href={`mailto:${d.email}`} className="text-xs font-medium text-blue-600 hover:underline truncate block">{d.email}</a></div>}
+                    {docs.personalCode && <div><p className="text-[10px] text-muted">{t('Asmens kodas')}</p><p className="text-xs font-mono font-medium">{docs.personalCode}</p></div>}
+                    {docs.passportNo && <div><p className="text-[10px] text-muted">{t('Paso NR.')}</p><p className="text-xs font-mono font-medium">{docs.passportNo}</p></div>}
+                    {docs.tachoCountry && <div><p className="text-[10px] text-muted">{t('Tacho šalis')}</p><p className="text-xs font-medium">{docs.tachoCountry}</p></div>}
+                    {d.tabNr && <div><p className="text-[10px] text-muted">{t('DS Nr.')}</p><p className="text-xs font-mono font-medium">{d.tabNr}</p></div>}
+                    {d.email && <div className="col-span-2 min-w-0"><p className="text-[10px] text-muted">{t('El. paštas')}</p><a href={`mailto:${d.email}`} className="text-xs font-medium text-blue-600 hover:underline truncate block">{d.email}</a></div>}
                   </div>
                 )}
 
@@ -2583,17 +2584,17 @@ function DriverProfileDrawer({ driver, plans, carAssignments, history, onClose, 
                           it.state === 'expired' ? 'bg-red-100 text-red-600' : it.state === 'soon' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-50 text-emerald-600')}>
                           {it.key === 'passportExpiry' ? <Contact size={14} /> : it.key === 'tachoCardExpiry' ? <CreditCard size={14} /> : <FileCheck2 size={14} />}
                         </div>
-                        <span className="text-[13px] font-semibold flex-1">{it.label}</span>
+                        <span className="text-[13px] font-semibold flex-1">{t(it.label)}</span>
                         <div className="text-right">
                           <p className={cn('text-xs font-mono font-semibold', it.state === 'expired' ? 'text-red-600' : it.state === 'soon' ? 'text-amber-700' : 'text-ink')}>{it.iso}</p>
                           <p className={cn('text-[10px]', it.state === 'expired' ? 'text-red-500' : it.state === 'soon' ? 'text-amber-600' : 'text-muted')}>
-                            {it.days != null ? (it.days < 0 ? `Pasibaigė prieš ${Math.abs(it.days)} d.` : it.days === 0 ? 'Baigiasi šiandien' : `Liko ${it.days} d.`) : ''}
+                            {it.days != null ? (it.days < 0 ? `${t('Pasibaigė prieš')} ${Math.abs(it.days)} ${t('d.')}` : it.days === 0 ? t('Baigiasi šiandien') : `${t('Liko')} ${it.days} ${t('d.')}`) : ''}
                           </p>
                         </div>
                       </div>
                     ))}
                   </div>
-                ) : <p className="text-xs text-muted">Dokumentų datų nėra. Importuokite Excel sąrašą.</p>}
+                ) : <p className="text-xs text-muted">{t('Dokumentų datų nėra. Importuokite Excel sąrašą.')}</p>}
               </div>
             );
           })()}
@@ -2601,7 +2602,7 @@ function DriverProfileDrawer({ driver, plans, carAssignments, history, onClose, 
           {/* Susiję planai */}
           {relPlans.length > 0 && (
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">Susiję keitimai</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">{t('Susiję keitimai')}</p>
               <div className="space-y-1.5">
                 {relPlans.map(p => (
                   <div key={p.id} className="flex items-center gap-2 text-xs bg-surface border border-hairline rounded-lg px-3 py-2">
@@ -2618,7 +2619,7 @@ function DriverProfileDrawer({ driver, plans, carAssignments, history, onClose, 
           {/* Darbo / poilsio istorija */}
           {tl.length > 0 && (
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">Darbo ir poilsio istorija</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">{t('Darbo ir poilsio istorija')}</p>
               <div className="space-y-1.5">
                 {tl.map((it, i) => {
                   const days = dayCount(it.from, it.to);
@@ -2629,11 +2630,11 @@ function DriverProfileDrawer({ driver, plans, carAssignments, history, onClose, 
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] font-semibold leading-tight">
-                          {it.type === 'work' ? <>Dirbo · <span className="font-mono">{it.car}</span></> : 'Ilsėjosi'}
+                          {it.type === 'work' ? <>{t('Dirbo')} · <span className="font-mono">{it.car}</span></> : t('Ilsėjosi')}
                         </p>
-                        <p className="text-[11px] text-muted">{it.from} – {it.to || 'dabar'}</p>
+                        <p className="text-[11px] text-muted">{it.from} – {it.to || t('dabar')}</p>
                       </div>
-                      <span className="text-[11px] font-medium text-muted shrink-0 tabular-nums">{days > 0 ? `${days} d.` : ''}</span>
+                      <span className="text-[11px] font-medium text-muted shrink-0 tabular-nums">{days > 0 ? `${days} ${t('d.')}` : ''}</span>
                     </div>
                   );
                 })}
@@ -2652,6 +2653,7 @@ function CarProfileDrawer({ car, drivers, plans, carAssignments, history, onClos
   car: Car; drivers: Driver[]; plans: ReplacementPlan[]; carAssignments: CarAssignment[]; history: HistoryEntry[];
   onClose: () => void; onAssign: (c: Car) => void; onEdit: (c: Car) => void;
 }) {
+  const t = useT();
   const driver = drivers.find(d => d.currentCar === car.number);
   const relPlans = plans.filter(p => p.carNumber === car.number).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
   const assigns = carAssignments.filter(a => a.carNumber === car.number).sort((a, b) => b.startDate.localeCompare(a.startDate)).slice(0, 8);
@@ -2677,36 +2679,36 @@ function CarProfileDrawer({ car, drivers, plans, carAssignments, history, onClos
             <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg"><X size={18} /></button>
           </div>
           <div className="flex items-center gap-2 mt-4">
-            <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", car.status === 'Aktyvus' ? "bg-emerald-400/20 text-emerald-100" : "bg-red-500/25 text-red-100")}><span className={cn("w-1.5 h-1.5 rounded-full", car.status === 'Aktyvus' ? "bg-emerald-300" : "bg-red-300")} />{car.status}</span>
-            <span className={cn("rounded-full px-2.5 py-1 text-xs font-medium", driver ? "bg-blue-400/20 text-blue-100" : "bg-white/10")}>{driver ? 'Užimta' : 'Laisva'}</span>
+            <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", car.status === 'Aktyvus' ? "bg-emerald-400/20 text-emerald-100" : "bg-red-500/25 text-red-100")}><span className={cn("w-1.5 h-1.5 rounded-full", car.status === 'Aktyvus' ? "bg-emerald-300" : "bg-red-300")} />{t(car.status)}</span>
+            <span className={cn("rounded-full px-2.5 py-1 text-xs font-medium", driver ? "bg-blue-400/20 text-blue-100" : "bg-white/10")}>{driver ? t('Užimta') : t('Laisva')}</span>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="bg-surface rounded-2xl border border-hairline p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">Dabartinis vairuotojas</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">{t('Dabartinis vairuotojas')}</p>
             {driver ? <>
               <div className="flex items-center gap-3 mt-1">
                 <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-semibold shrink-0">{driver.name.split(' ').map(w => w[0]).slice(0, 2).join('')}</div>
-                <div><p className="font-semibold text-sm">{driver.name}</p><p className="text-[11px] text-muted">{driver.companyType} · {driver.specialization}</p></div>
+                <div><p className="font-semibold text-sm">{driver.name}</p><p className="text-[11px] text-muted">{driver.companyType} · {t(driver.specialization)}</p></div>
               </div>
-              <div className="mt-3 pt-3 border-t border-hairline"><Row k="Reiso pradžia" v={driver.startDate || '—'} /><Row k="Numatomas grįžimas" v={driver.plannedReturnDate || '—'} /></div>
+              <div className="mt-3 pt-3 border-t border-hairline"><Row k={t('Reiso pradžia')} v={driver.startDate || '—'} /><Row k={t('Numatomas grįžimas')} v={driver.plannedReturnDate || '—'} /></div>
             </> : (
               <div className="flex items-center justify-between mt-1">
-                <span className="text-sm text-muted italic">Mašina laisva</span>
-                <button onClick={() => onAssign(car)} className="px-3 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-ink/85 transition-colors">Priskirti</button>
+                <span className="text-sm text-muted italic">{t('Mašina laisva')}</span>
+                <button onClick={() => onAssign(car)} className="px-3 py-1.5 bg-ink text-white text-xs font-semibold rounded-lg hover:bg-ink/85 transition-colors">{t('Priskirti')}</button>
               </div>
             )}
           </div>
 
           <div className="flex gap-2">
-            {!driver && <button onClick={() => onAssign(car)} className="flex-1 inline-flex items-center justify-center gap-2 bg-ink text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-ink/85 transition-colors"><LogIn size={15} /> Priskirti vairuotoją</button>}
-            <button onClick={() => onEdit(car)} className={cn("inline-flex items-center justify-center gap-2 px-4 bg-ink/[0.05] text-ink rounded-xl text-sm font-semibold hover:bg-ink hover:text-white transition-all", !driver ? "" : "flex-1 py-2.5")}><Edit size={15} /> {driver && 'Redaguoti'}</button>
+            {!driver && <button onClick={() => onAssign(car)} className="flex-1 inline-flex items-center justify-center gap-2 bg-ink text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-ink/85 transition-colors"><LogIn size={15} /> {t('Priskirti vairuotoją')}</button>}
+            <button onClick={() => onEdit(car)} className={cn("inline-flex items-center justify-center gap-2 px-4 bg-ink/[0.05] text-ink rounded-xl text-sm font-semibold hover:bg-ink hover:text-white transition-all", !driver ? "" : "flex-1 py-2.5")}><Edit size={15} /> {driver && t('Redaguoti')}</button>
           </div>
 
           {relPlans.length > 0 && (
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">Keitimai</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">{t('Keitimas')}</p>
               <div className="space-y-1.5">
                 {relPlans.map(p => (
                   <div key={p.id} className="flex items-center gap-2 text-xs bg-surface border border-hairline rounded-lg px-3 py-2">
@@ -2721,7 +2723,7 @@ function CarProfileDrawer({ car, drivers, plans, carAssignments, history, onClos
 
           {assigns.length > 0 && (
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">Kas vairavo šią mašiną</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">{t('Kas vairavo šią mašiną')}</p>
               <div className="space-y-1.5">
                 {assigns.map(a => {
                   let days = 0; try { days = differenceInDays(a.endDate ? parseISO(a.endDate) : new Date(), parseISO(a.startDate)); } catch { /* ignore */ }
@@ -2730,9 +2732,9 @@ function CarProfileDrawer({ car, drivers, plans, carAssignments, history, onClos
                       <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-semibold shrink-0">{a.driverName.split(' ').map(w => w[0]).slice(0, 2).join('')}</div>
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] font-semibold truncate leading-tight">{a.driverName}</p>
-                        <p className="text-[11px] text-muted">{a.startDate} – {a.endDate || 'dabar'}</p>
+                        <p className="text-[11px] text-muted">{a.startDate} – {a.endDate || t('dabar')}</p>
                       </div>
-                      <span className="text-[11px] font-medium text-muted shrink-0 tabular-nums">{days > 0 ? `${days} d.` : ''}</span>
+                      <span className="text-[11px] font-medium text-muted shrink-0 tabular-nums">{days > 0 ? `${days} ${t('d.')}` : ''}</span>
                     </div>
                   );
                 })}
@@ -2777,6 +2779,7 @@ function EmptyState({ icon, text, variant = 'road' }: { icon?: React.ReactNode; 
 }
 
 function HomeDriverCard({ driver, onSendToTrip }: { driver: Driver; onSendToTrip: () => void }) {
+  const t = useT();
   // Ar jau galima siųsti (poilsis pasibaigęs)?
   const ready = driver.readinessDate ? !isAfter(parseISO(driver.readinessDate), new Date()) : true;
   return (
@@ -2786,13 +2789,13 @@ function HomeDriverCard({ driver, onSendToTrip }: { driver: Driver; onSendToTrip
       </div>
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-[13px] truncate leading-tight">{driver.name}</p>
-        <p className="text-[10px] text-muted truncate mt-0.5">{driver.companyType} · {driver.specialization} · {driver.homeStatus}</p>
+        <p className="text-[10px] text-muted truncate mt-0.5">{driver.companyType} · {t(driver.specialization)} · {t(driver.homeStatus)}</p>
       </div>
       <div className="text-right shrink-0 leading-tight">
-        <p className="text-[8px] uppercase tracking-wide text-muted">{ready ? 'Galima' : 'Poilsis iki'}</p>
+        <p className="text-[8px] uppercase tracking-wide text-muted">{ready ? t('Galima') : t('Poilsis iki')}</p>
         <p className={cn("text-[11px] font-semibold tabular-nums", ready ? "text-emerald-600" : "text-blue-600")}>{driver.readinessDate || '—'}</p>
       </div>
-      <button onClick={onSendToTrip} title="Siųsti į reisą" className="shrink-0 w-8 h-8 rounded-lg bg-ink/[0.06] text-ink hover:bg-ink hover:text-white flex items-center justify-center transition-all">
+      <button onClick={onSendToTrip} title={t('Siųsti į reisą')} className="shrink-0 w-8 h-8 rounded-lg bg-ink/[0.06] text-ink hover:bg-ink hover:text-white flex items-center justify-center transition-all">
         <ArrowRight size={15}/>
       </button>
     </div>
