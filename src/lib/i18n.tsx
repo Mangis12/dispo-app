@@ -38,6 +38,9 @@ const RU: Record<string, string> = {
 
   // — Keitimo juodraštis —
   'Laisvi vairuotojai': 'Свободные водители',
+  'Šią savaitę keičiasi': 'Меняются на этой неделе',
+  'Šią savaitę keičiamų mašinų nėra': 'На этой неделе нет машин для замены',
+  'Mašinos atsiranda automatiškai, kai vairuotojas grįžta šią savaitę': 'Машины появляются автоматически, когда водитель возвращается на этой неделе',
   'Nutempkite vairuotoją ant mašinos': 'Перетащите водителя на машину',
   'Visi vairuotojai paskirstyti': 'Все водители распределены',
   'Mašinos': 'Машины',

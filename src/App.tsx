@@ -1906,7 +1906,18 @@ export default function App() {
           const homeDrivers = drivers.filter(d => d.status === 'Namuose');
           const usedIds = new Set(drafts.map(d => d.incomingDriverId));
           const pool = homeDrivers.filter(d => !usedIds.has(d.id));
-          const boardCars = cars.filter(c => c.status === 'Aktyvus');
+          // Tik mašinos, kurios keičiasi šią savaitę: dabartinis vairuotojas grįžta
+          // iki šios savaitės pabaigos (įskaitant vėluojančius) ir dar nesuplanuota.
+          const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
+          const boardCars = cars.filter(c => {
+            if (c.status !== 'Aktyvus') return false;
+            if (drafts.some(d => d.carNumber === c.number)) return true; // jau įdėtas į juodraštį — paliekam matomą
+            const cur = drivers.find(d => d.currentCar === c.number && d.status === 'Reise');
+            if (!cur || !cur.plannedReturnDate) return false;
+            const alreadyPlanned = plans.some(p => p.status === 'Suplanuota' && p.carNumber === c.number);
+            if (alreadyPlanned) return false;
+            try { return parseISO(cur.plannedReturnDate) <= weekEnd; } catch { return false; }
+          });
           const draftFor = (carNumber: string) => drafts.find(d => d.carNumber === carNumber);
           const driverById = (id: string) => drivers.find(d => d.id === id);
           const inits = (name: string) => name.split(' ').map(w => w[0]).slice(0, 2).join('');
@@ -1960,9 +1971,16 @@ export default function App() {
               <div className="lg:col-span-2">
                 <div className="flex items-center gap-2 px-1 mb-2">
                   <Truck size={15} className="text-ink/70" />
-                  <p className="text-sm font-semibold">{t('Mašinos')}</p>
+                  <p className="text-sm font-semibold">{t('Šią savaitę keičiasi')}</p>
                   <span className="text-xs text-muted">· {boardCars.length}</span>
                 </div>
+                {boardCars.length === 0 && (
+                  <div className="bg-surface rounded-2xl border border-hairline py-12 px-6 text-center">
+                    <CheckCircle2 size={26} className="mx-auto text-emerald-400 mb-2" />
+                    <p className="text-sm font-medium text-ink">{t('Šią savaitę keičiamų mašinų nėra')}</p>
+                    <p className="text-xs text-muted mt-1">{t('Mašinos atsiranda automatiškai, kai vairuotojas grįžta šią savaitę')}</p>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {boardCars.map(car => {
                     const leaving = drivers.find(d => d.currentCar === car.number && d.status === 'Reise');
