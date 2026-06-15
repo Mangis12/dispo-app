@@ -44,6 +44,8 @@ export interface Car {
   type: CarType;
   registration: RegistrationType;
   activeFrom?: string;
+  brand?: string;   // Markė (pvz. DAF XF)
+  year?: number;    // Gamybos metai
 }
 
 export interface HistoryEntry {

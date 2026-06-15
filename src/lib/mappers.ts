@@ -53,6 +53,8 @@ export const carToRow = (c: Car): Row => ({
   type: c.type,
   registration: c.registration,
   active_from: c.activeFrom ?? null,
+  brand: c.brand ?? null,
+  year: c.year ?? null,
 });
 
 export const carFromRow = (r: Row): Car => ({
@@ -62,6 +64,8 @@ export const carFromRow = (r: Row): Car => ({
   type: r.type as Car['type'],
   registration: r.registration as Car['registration'],
   activeFrom: (r.active_from as string | undefined) ?? undefined,
+  brand: (r.brand as string | null) ?? undefined,
+  year: (r.year as number | null) ?? undefined,
 });
 
 // ── HistoryEntry ─────────────────────────────────────────────────────────────

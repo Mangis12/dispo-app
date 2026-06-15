@@ -22,6 +22,7 @@ import TripPlanner from './components/TripPlanner';
 import CoordinatorBoard from './components/CoordinatorBoard';
 import { EmptyRoad, EmptyChecklist, SemiTruck, EuropeMap } from './components/illustrations';
 import { parseDriverWorkbook, mergeIntoDriver, buildDriverIndex, findExisting, buildDriverTemplate, type ParsedDriver } from './lib/importDrivers';
+import { parseCarWorkbook, mergeIntoCar, buildCarIndex, findExistingCar, buildCarTemplate, type ParsedCar } from './lib/importCars';
 import type {
   Driver, DriverStatus, HomeStatus, Car, HistoryEntry,
   ReplacementPlan, RegistrationType, DriverSpecialization, CarType, CarAssignment, TaskPoint, CalendarNote
@@ -265,6 +266,10 @@ export default function App() {
   const [importRows, setImportRows]           = useState<ParsedDriver[]>([]);
   const [importMeta, setImportMeta]           = useState<{ fileName: string; cols: string[] } | null>(null);
   const [importErr, setImportErr]             = useState<string | null>(null);
+  const [carImportOpen, setCarImportOpen]     = useState(false);
+  const [carImportRows, setCarImportRows]     = useState<ParsedCar[]>([]);
+  const [carImportMeta, setCarImportMeta]     = useState<{ fileName: string } | null>(null);
+  const [carImportErr, setCarImportErr]       = useState<string | null>(null);
   // Automobilių „duomenų bazė"
   const [carView, setCarView]                 = useState<'table' | 'kanban' | 'cards'>('cards');
   const [profileCar, setProfileCar]           = useState<Car | null>(null);
@@ -520,6 +525,61 @@ export default function App() {
     setCars(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
     setEditCarOpen(false); setSelectedCarForEdit(null);
     showToast('Automobilis atnaujintas');
+  };
+
+  // ── Automobilių Excel importas ──────────────────────────────────────────────
+  const downloadCarTemplate = () => {
+    const url = URL.createObjectURL(buildCarTemplate());
+    const a = document.createElement('a');
+    a.href = url; a.download = 'automobiliu_sablonas.xlsx';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCarImportFile = async (file: File) => {
+    setCarImportErr(null);
+    try {
+      const { rows } = parseCarWorkbook(await file.arrayBuffer());
+      if (rows.length === 0) {
+        setCarImportErr('Faile nerasta automobilių. Patikrinkite stulpelį „Mašinos nr".');
+        setCarImportRows([]); setCarImportMeta(null);
+        return;
+      }
+      setCarImportRows(rows);
+      setCarImportMeta({ fileName: file.name });
+    } catch {
+      setCarImportErr('Nepavyko nuskaityti failo. Tinka .xlsx, .xls arba .csv.');
+      setCarImportRows([]); setCarImportMeta(null);
+    }
+  };
+
+  const carImportDiff = useMemo(() => {
+    const index = buildCarIndex(cars);
+    let updated = 0, created = 0;
+    carImportRows.forEach(p => { if (findExistingCar(index, p)) updated++; else created++; });
+    return { updated, created };
+  }, [carImportRows, cars]);
+
+  const applyCarImport = () => {
+    setCars(prev => {
+      const next = [...prev];
+      const index = buildCarIndex(next);
+      carImportRows.forEach(p => {
+        const existing = findExistingCar(index, p);
+        if (existing) {
+          const idx = next.findIndex(c => c.id === existing.id);
+          if (idx >= 0) next[idx] = mergeIntoCar(existing, p);
+        } else {
+          const created = { ...mergeIntoCar(undefined, p), id: uid() };
+          next.push(created);
+          index.set(created.number.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ''), created);
+        }
+      });
+      return next;
+    });
+    showToast(`Importuota: ${carImportDiff.created} nauji, ${carImportDiff.updated} atnaujinti`);
+    setCarImportOpen(false);
+    setCarImportRows([]); setCarImportMeta(null); setCarImportErr(null);
   };
 
   const deleteCar = (id: string) => {
@@ -1511,6 +1571,7 @@ export default function App() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-mono font-bold text-base tracking-tight">{car.number}</p>
+                    {(car.brand || car.year) && <p className="text-[11px] text-muted truncate">{[car.brand, car.year].filter(Boolean).join(' · ')}</p>}
                     <div className="flex gap-1.5 mt-1 flex-wrap">
                       <Badge variant="blue">{car.type}</Badge>
                       <Badge>{car.registration}</Badge>
@@ -1565,6 +1626,7 @@ export default function App() {
                 </select>
                 <input placeholder="Paieška..." className={cn(inputCls, 'w-32')} value={carFilter.search} onChange={e => setCarFilter(p => ({ ...p, search: e.target.value }))} />
                 <button onClick={() => exportCarsCSV(fc)} title="Eksportuoti visus į CSV" className="p-2 rounded-lg border border-hairline text-muted hover:text-ink hover:border-ink/30 transition-all"><Download size={15} /></button>
+                <button onClick={() => { setCarImportRows([]); setCarImportMeta(null); setCarImportErr(null); setCarImportOpen(true); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ink text-white text-xs font-semibold hover:bg-ink/85 transition-all"><Upload size={14} /> Importuoti Excel</button>
               </div>
             </div>
 
@@ -1621,7 +1683,7 @@ export default function App() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", car.status === 'Aktyvus' ? "bg-ink text-gold-soft" : "bg-red-50 text-red-400")}><TypeIcon t={car.type} className="w-4 h-4" /></div>
-                              <div><div className="font-mono font-bold">{car.number}</div><div className="text-[10px] text-muted">{car.type}</div></div>
+                              <div><div className="font-mono font-bold">{car.number}</div><div className="text-[10px] text-muted">{[car.type, car.brand, car.year].filter(Boolean).join(' · ')}</div></div>
                             </div>
                           </td>
                           <td className="px-4 py-3"><Badge>{car.registration}</Badge></td>
@@ -1921,6 +1983,89 @@ export default function App() {
               <div className="px-6 py-4 border-t border-hairline flex items-center justify-end gap-2 shrink-0">
                 <button onClick={() => setImportOpen(false)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-muted hover:text-ink hover:bg-stone-100 transition-colors">Atšaukti</button>
                 <button onClick={applyImport} className="inline-flex items-center gap-2 bg-ink text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-ink/85 transition-all"><FileCheck2 size={15} /> Importuoti į sistemą</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Automobilių Excel importas ── */}
+      {carImportOpen && (
+        <div className="fixed inset-0 bg-ink/30 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-surface w-full max-w-2xl rounded-3xl shadow-float border border-hairline overflow-hidden slide-in-from-bottom-4 flex flex-col max-h-[88vh]">
+            <div className="px-6 py-5 flex items-center justify-between border-b border-hairline shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-ink flex items-center justify-center"><FileSpreadsheet size={17} className="text-gold-soft" /></div>
+                <div>
+                  <h2 className="text-base font-semibold tracking-tight">Importuoti automobilių sąrašą</h2>
+                  <p className="text-[11px] text-muted">Excel (.xlsx / .xls) arba .csv · duomenys atsinaujins sistemoje</p>
+                </div>
+              </div>
+              <button onClick={() => setCarImportOpen(false)} className="p-1.5 text-muted hover:text-ink hover:bg-stone-100 rounded-lg transition-colors"><X size={16} /></button>
+            </div>
+
+            <div className="px-6 py-5 overflow-y-auto">
+              {carImportRows.length === 0 ? (
+                <>
+                  <label className="block cursor-pointer">
+                    <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleCarImportFile(f); e.currentTarget.value = ''; }} />
+                    <div className="border-2 border-dashed border-hairline hover:border-gold/60 rounded-2xl p-10 text-center transition-colors bg-canvas">
+                      <Upload size={28} className="mx-auto text-muted mb-3" />
+                      <p className="text-sm font-semibold text-ink">Pasirinkite Excel failą</p>
+                      <p className="text-xs text-muted mt-1">Stulpeliai atpažįstami automatiškai: Mašinos nr, Markė, Ref/Tent, Gamybos metai, Registracija.</p>
+                    </div>
+                  </label>
+                  {carImportErr && <p className="mt-4 text-xs font-medium text-red-600 bg-red-50 rounded-xl px-3 py-2.5">{carImportErr}</p>}
+
+                  <div className="mt-4 rounded-2xl border border-hairline bg-canvas p-4">
+                    <p className="text-xs font-semibold text-ink mb-0.5">Nežinote formato? Atsisiųskite pavyzdį</p>
+                    <p className="text-[11px] text-muted mb-3">Užpildykite šabloną (Mašinos nr · Markė · Ref/Tent · Gamybos metai) ir įkelkite atgal.</p>
+                    <button onClick={downloadCarTemplate} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-hairline bg-surface text-xs font-semibold text-ink hover:border-ink/40 hover:bg-ink hover:text-white transition-all"><Download size={13} /> Automobilių šablonas</button>
+                  </div>
+                  <div className="mt-4 flex items-start gap-2 text-[11px] text-muted bg-gold/5 border border-gold/20 rounded-xl px-3 py-2.5">
+                    <ShieldCheck size={14} className="text-gold shrink-0 mt-0.5" />
+                    <span>Atitikimas pagal <b>Mašinos nr</b>. Esami automobiliai <b>atnaujinami</b>, nauji — <b>pridedami</b> (būsena „Aktyvus"). Vairuotojų priskyrimai nekeičiami.</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center gap-2 mb-4">
+                    <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg">+{carImportDiff.created} nauji</span>
+                    <span className="text-xs font-semibold bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg">{carImportDiff.updated} atnaujinami</span>
+                    <span className="text-xs text-muted ml-1">{carImportMeta?.fileName} · {carImportRows.length} eilutės</span>
+                    <button onClick={() => { setCarImportRows([]); setCarImportMeta(null); }} className="ml-auto text-xs text-muted hover:text-ink underline">Kitas failas</button>
+                  </div>
+                  <div className="rounded-xl border border-hairline overflow-hidden overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead><tr className="bg-ink text-white text-left">
+                        <th className="px-3 py-2 font-bold">Mašinos nr</th>
+                        <th className="px-3 py-2 font-bold">Markė</th>
+                        <th className="px-3 py-2 font-bold">Tipas</th>
+                        <th className="px-3 py-2 font-bold">Metai</th>
+                        <th className="px-3 py-2 font-bold">Reg.</th>
+                      </tr></thead>
+                      <tbody>
+                        {carImportRows.slice(0, 80).map((p, i) => (
+                          <tr key={i} className="border-t border-hairline odd:bg-canvas/40">
+                            <td className="px-3 py-2 font-mono font-semibold text-ink">{p.number}</td>
+                            <td className="px-3 py-2">{p.brand || '—'}</td>
+                            <td className="px-3 py-2">{p.type}</td>
+                            <td className="px-3 py-2 font-mono">{p.year || '—'}</td>
+                            <td className="px-3 py-2">{p.registration}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {carImportRows.length > 80 && <p className="text-[11px] text-muted mt-2">Rodoma 80 iš {carImportRows.length}. Importuojami visi.</p>}
+                </>
+              )}
+            </div>
+
+            {carImportRows.length > 0 && (
+              <div className="px-6 py-4 border-t border-hairline flex items-center justify-end gap-2 shrink-0">
+                <button onClick={() => setCarImportOpen(false)} className="px-4 py-2.5 rounded-xl text-sm font-semibold text-muted hover:text-ink hover:bg-stone-100 transition-colors">Atšaukti</button>
+                <button onClick={applyCarImport} className="inline-flex items-center gap-2 bg-ink text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-ink/85 transition-all"><FileCheck2 size={15} /> Importuoti į sistemą</button>
               </div>
             )}
           </div>
@@ -2513,7 +2658,7 @@ function CarProfileDrawer({ car, drivers, plans, carAssignments, history, onClos
               </div>
               <div>
                 <p className="font-display text-xl font-medium leading-tight font-mono">{car.number}</p>
-                <p className="text-xs text-white/70 mt-1">{car.type} · {car.registration}</p>
+                <p className="text-xs text-white/70 mt-1">{[car.brand, car.year].filter(Boolean).join(' · ') || `${car.type} · ${car.registration}`}</p>
               </div>
             </div>
             <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg"><X size={18} /></button>
